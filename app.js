@@ -17,8 +17,8 @@ function dashRange(){
       const span=(to.getFullYear()-from.getFullYear())*12+(to.getMonth()-from.getMonth());
       return span>11?mos[d.getMonth()]+' '+(d.getFullYear()%100):mos[d.getMonth()];
     }); const {all, qAll} = buildContracts();
-    const allData = all.concat(qAll).filter(c=>c.musd>0);
-    const names = [...new Set(allData.map(c=>c.client))];
+    const allData = all.concat(qAll).filter(c=>c.musd!==0);
+    const names = [...new Set(allData.filter(c=>c.musd>0).map(c=>c.client))];
     const now = new Date();
 
     const getMRR = (name, date) => allData.filter(c=>c.client===name && c.st<=date && c.endD>=date).reduce((s,x)=>s+x.musd,0);
@@ -139,13 +139,14 @@ function mrrData(year){
   year=year||S.mrrYear||2026;
   const cacheKey='mrr_'+year;
   return cached(cacheKey,()=>{
+    const now=new Date();
     const allC={};
-    S.rows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);const c=r.Client;if(!allC[c])allC[c]=[];allC[c].push({musd:r._mUSD||0,st,endD,mgr:r.Manager||'',hudud:r.Hudud||'',sanasi:r.sanasi||'',amal:r['amal qilishi']||''})});
-    S.qRows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);const c=r.Client;if(!allC[c])allC[c]=[];allC[c].push({musd:r._mUSD||0,st,endD,mgr:r.Manager||'',hudud:r.Hudud||'',sanasi:r.sanasi||'',amal:r['amal qilishi']||'',isQ:true})});
+    S.rows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);endD.setHours(23,59,59,999);const c=r.Client;if(!allC[c])allC[c]=[];allC[c].push({musd:r._mUSD||0,st,endD,mgr:r.Manager||'',hudud:r.Hudud||'',sanasi:r.sanasi||'',amal:r['amal qilishi']||''})});
+    S.qRows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);endD.setHours(23,59,59,999);const c=r.Client;if(!allC[c])allC[c]=[];allC[c].push({musd:r._mUSD||0,st,endD,mgr:r.Manager||'',hudud:r.Hudud||'',sanasi:r.sanasi||'',amal:r['amal qilishi']||'',isQ:true})});
     
     const cmap={};
     Object.entries(allC).forEach(([name,contracts])=>{
-      const paid=contracts.filter(ct=>ct.musd>0);
+      const paid=contracts.filter(ct=>ct.musd!==0);
       if(!paid.length) return;
       
       const mains = contracts.filter(c => !c.isQ).sort((a,b)=>a.st-b.st);
@@ -164,20 +165,17 @@ function mrrData(year){
         if(!act.length) continue;
         
         // Max Daily MRR in this month
-        let maxMrr = 0;
-        const endDay = mE.getDate();
-        for(let d=1; d<=endDay; d++) {
-            const checkDt = new Date(year, m, d, 23, 59, 59); // Kun oxiridagi faollikni tekshiramiz
-            let dayMrr = 0;
-            for(let i=0; i<act.length; i++) {
-                const ct = act[i];
-                if(ct.st <= checkDt && ct.endD >= checkDt) {
-                    dayMrr += ct.musd;
-                }
+        let checkDt = mE;
+        if (checkDt > now) checkDt = now;
+        
+        let dayMrr = 0;
+        for(let i=0; i<act.length; i++) {
+            const ct = act[i];
+            if(ct.st <= checkDt && ct.endD >= checkDt) {
+                dayMrr += ct.musd;
             }
-            if(dayMrr > maxMrr) maxMrr = dayMrr;
         }
-        monthly[m] = maxMrr;
+        monthly[m] = dayMrr;
       }
       
       if(Math.max(...monthly) > 0) {
@@ -185,7 +183,7 @@ function mrrData(year){
       }
     });
 
-    const now=new Date();const curM=now.getFullYear()===year?now.getMonth():(year<now.getFullYear()?11:0);
+    const curM=now.getFullYear()===year?now.getMonth():(year<now.getFullYear()?11:0);
     Object.values(cmap).forEach(c=>{c.mrr=c.monthly[curM]||Math.max(...c.monthly)});
     const clients=Object.values(cmap).sort((a,b)=>(a.startDate||0)-(b.startDate||0));
     
@@ -201,19 +199,14 @@ function mrrData(year){
         const act=paid.filter(ct=>ct.st<=pdE && ct.endD>=pdS);
         if(!act.length) return;
         
-        let maxMrr = 0;
-        for(let d=1; d<=31; d++) {
-            const checkDt = new Date(year-1, 11, d, 23, 59, 59);
-            let dayMrr = 0;
-            for(let i=0; i<act.length; i++) {
-                const ct = act[i];
-                if(ct.st <= checkDt && ct.endD >= checkDt) {
-                    dayMrr += ct.musd;
-                }
+        let dayMrr = 0;
+        for(let i=0; i<act.length; i++) {
+            const ct = act[i];
+            if(ct.st <= pdE && ct.endD >= pdE) {
+                dayMrr += ct.musd;
             }
-            if(dayMrr > maxMrr) maxMrr = dayMrr;
         }
-        prevDec += maxMrr;
+        prevDec += dayMrr;
     });
     
     const mom=totals.map((v,i)=>{const prev=i===0?prevDec:totals[i-1];return prev?((v-prev)/prev*100):0});
@@ -240,7 +233,7 @@ function mrrData(year){
 function calcCumExpected(year){
   return cached('cumExp_'+year,()=>{
     const result={};const allCts={};
-    S.rows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st||!r._mUSD||r._mUSD<=0)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);const c=r.Client;if(!allCts[c])allCts[c]=[];allCts[c].push({musd:r._mUSD,st,endD,isQ:false})});
+    S.rows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st||!r._mUSD||r._mUSD<=0)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);endD.setHours(23,59,59,999);const c=r.Client;if(!allCts[c])allCts[c]=[];allCts[c].push({musd:r._mUSD,st,endD,isQ:false})});
     S.qRows.forEach(r=>{if(!r.Client||!r.sanasi)return;const musd=pn(r['Oylik USD']);if(!musd)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(parseFloat(r['muddati (oy)'])||12)*30.44*24*3600*1000);const c=r.Client;if(!allCts[c])allCts[c]=[];allCts[c].push({musd,st,endD,isQ:true})});
     Object.entries(allCts).forEach(([name,cts])=>{
       const minSt=cts.reduce((a,c)=>c.st<a?c.st:a,cts[0].st);

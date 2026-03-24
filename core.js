@@ -95,8 +95,8 @@ function calcClientPayments(){
 function buildContracts(){
   return cached('contracts',()=>{
     const all=[],qAll=[];
-    S.rows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);all.push({client:r.Client,musd:r._mUSD||0,st,endD,mgr:r.Manager||'',hudud:r.Hudud||'',dur:r._dur||0,tUSD:r._tUSD||0,sUSD:r._sUSD||0,izoh:r.izoh||'',raqami:r.raqami||''})});
-    S.qRows.forEach(r=>{if(!r.Client||!r.sanasi)return;const musd=pn(r['Oylik USD']);if(!musd)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(parseFloat(r['muddati (oy)'])||12)*30.44*24*3600*1000);qAll.push({client:r.Client,musd,st,endD,mgr:r.Manager||'',hudud:'',dur:0,tUSD:0,sUSD:0,izoh:'',raqami:''})});
+    S.rows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);endD.setHours(23,59,59,999);all.push({client:r.Client,musd:r._mUSD||0,st,endD,mgr:r.Manager||'',hudud:r.Hudud||'',dur:r._dur||0,tUSD:r._tUSD||0,sUSD:r._sUSD||0,izoh:r.izoh||'',raqami:r.raqami||''})});
+    S.qRows.forEach(r=>{if(!r.Client||!r.sanasi)return;const musd=pn(r['Oylik USD']);if(!musd)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(parseFloat(r['muddati (oy)'])||12)*30.44*24*3600*1000);endD.setHours(23,59,59,999);qAll.push({client:r.Client,musd,st,endD,mgr:r.Manager||'',hudud:'',dur:0,tUSD:0,sUSD:0,izoh:'',raqami:''})});
     return{all,qAll};
   });
 }
@@ -124,7 +124,7 @@ function calcDebtTable(reportDate){
   S.rows.forEach(r=>{
     if(!r.Client||!r.sanasi)return;
     const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;
-    const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);
+    const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);endD.setHours(23,59,59,999);
     const c=r.Client;
     if(!clients[c])clients[c]={name:c,contracts:[],totalSum:0,firma:r['Firma nomi']||''};
     clients[c].totalSum+=r._sUSD;
@@ -134,7 +134,7 @@ function calcDebtTable(reportDate){
     if(!r.Client||!r.sanasi)return;
     const musd=pn(r['Oylik USD']),tUSD=pn(r['Tadbiq USD']);
     const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;
-    const endD=en||new Date(st.getTime()+(parseFloat(r['muddati (oy)'])||12)*30.44*24*3600*1000);
+    const endD=en||new Date(st.getTime()+(parseFloat(r['muddati (oy)'])||12)*30.44*24*3600*1000);endD.setHours(23,59,59,999);
     const c=r.Client;
     if(!clients[c])clients[c]={name:c,contracts:[],totalSum:0,firma:''};
     if(musd>0){
