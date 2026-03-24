@@ -399,37 +399,178 @@ select.flt:focus{outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px r
 .toast-info{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent)}
 
 /* === MRR TABLE === */
-.mrr-tbl{font-size:11.5px;border-collapse:separate;border-spacing:0;width:100%}
-.mrr-tbl th,.mrr-tbl td{padding:5px 7px;border-bottom:1px solid #edece8;border-right:1px solid #f2f1ed}
-[data-theme="dark"] .mrr-tbl th,[data-theme="dark"] .mrr-tbl td{border-bottom-color:var(--border);border-right-color:var(--border)}
-.mrr-tbl thead th{
-  background:var(--bg3);position:sticky;top:0;z-index:3;
-  font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;
-  text-align:center;white-space:nowrap;border-bottom:2px solid var(--border);
-  color:var(--text3);font-weight:600;
+.mrr-tbl {
+  font-size:12.5px;
+  border-collapse:separate;
+  border-spacing:0;
+  width:100%;
 }
-.mrr-tbl .sticky-col{position:sticky;z-index:4;background:var(--bg2)}
-.mrr-tbl thead .sticky-col{z-index:5;background:var(--bg3)}
-.mrr-tbl .col-name{
-  left:0;min-width:150px;max-width:150px;text-align:left;
-  border-right:2px solid var(--border);font-weight:500;
+
+/* All cells: no borders by default */
+.mrr-tbl th,
+.mrr-tbl td {
+  padding:0;
+  border:none;
 }
-.mrr-tbl .mcell{
-  text-align:right;font-family:var(--mono);font-size:10.5px;
-  min-width:62px;white-space:nowrap;transition:background var(--transition-fast);
+
+/* Override global thead sticky — let individual th cells handle stickiness */
+.mrr-tbl thead {
+  position:static;
 }
-.mrr-tbl .mcell-g{background:rgba(17,122,82,0.18)}
-.mrr-tbl .mcell-y{background:rgba(220,170,40,0.22);cursor:help}
-.mrr-tbl .mcell-0{color:var(--text3);opacity:.4}
-[data-theme="dark"] .mrr-tbl .mcell-g{background:rgba(46,204,148,0.12)}
-[data-theme="dark"] .mrr-tbl .mcell-y{background:rgba(240,176,32,0.12)}
-.mrr-tbl .summary-row td{border-bottom:2px solid var(--border)}
-.mrr-tbl .row-mom td{color:var(--text3);font-size:9.5px;font-style:italic;font-weight:500}
-.mrr-tbl .row-total td{color:var(--text);background:var(--bg3);font-weight:700;font-size:11.5px}
-.mrr-tbl tbody tr:hover td:not(.mcell-g):not(.mcell-y){background:rgba(23,70,162,0.04) !important}
-.mrr-tbl tbody tr:hover td.mcell-g{background:rgba(17,122,82,0.14) !important}
-.mrr-tbl tbody tr:hover td.mcell-y{background:rgba(220,170,40,0.17) !important}
-.mrr-tbl tbody tr:hover .sticky-col{background:var(--bg4) !important}
+
+/* ── HEADER ROW: each th sticks independently to .tbl-scroll ── */
+.mrr-tbl thead th {
+  position:sticky;
+  top:0;
+  z-index:3;
+  background:var(--bg2);
+  padding:10px 14px;
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.9px;
+  color:var(--text3);
+  text-align:center;
+  white-space:nowrap;
+  border-bottom:2px solid var(--border);
+  border-top:1px solid var(--border);
+}
+
+/* ── STICKY LEFT COLUMN (body + header) ── */
+.mrr-tbl .sticky-col {
+  position:sticky;
+  left:0;
+  z-index:4;
+  background:var(--bg2);
+}
+
+/* ── STICKY CORNER: first header cell — highest priority ── */
+.mrr-tbl thead .sticky-col {
+  position:sticky;
+  top:0;           /* vertical sticky — must be explicit here */
+  left:0;          /* horizontal sticky — stays in corner */
+  z-index:20;      /* must beat both thead sticky AND col sticky */
+  background:var(--bg2);
+  text-align:left;
+  letter-spacing:.3px;
+  font-size:11px;
+}
+
+/* Right shadow to indicate frozen column */
+.mrr-tbl .sticky-col::after {
+  content:'';
+  position:absolute;
+  top:0; right:-8px; bottom:0;
+  width:8px;
+  background:linear-gradient(to right, rgba(0,0,0,0.04), transparent);
+  pointer-events:none;
+}
+
+.mrr-tbl .col-name {
+  min-width:190px;
+  max-width:220px;
+  padding:10px 16px;
+  font-weight:600;
+  font-size:12.5px;
+  text-align:left;
+}
+
+/* ── DATA CELLS ── */
+.mrr-tbl td {
+  padding:9px 14px;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+
+/* Month value cells */
+.mrr-tbl .mcell {
+  text-align:right;
+  font-family:var(--mono);
+  font-size:11.5px;
+  font-weight:500;
+  min-width:76px;
+  color:var(--text);
+}
+
+/* Empty / zero cells */
+.mrr-tbl .mcell-0 {
+  color:var(--border2);
+  font-size:11px;
+}
+
+/* Paid (green) */
+.mrr-tbl .mcell-g {
+  color:var(--green);
+  font-weight:700;
+  background:rgba(17,122,82,0.06);
+}
+[data-theme="dark"] .mrr-tbl .mcell-g {
+  background:rgba(46,204,148,0.05);
+}
+
+/* Partial (amber) */
+.mrr-tbl .mcell-y {
+  color:var(--amber);
+  font-weight:700;
+  background:rgba(163,98,7,0.06);
+  cursor:help;
+}
+[data-theme="dark"] .mrr-tbl .mcell-y {
+  background:rgba(240,176,32,0.05);
+}
+
+/* ── SUMMARY ROWS ── */
+/* MoM % row */
+.mrr-tbl .row-mom td {
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:600;
+  color:var(--text3);
+  background:transparent;
+  border-bottom:1px solid var(--border);
+  padding:8px 14px;
+}
+.mrr-tbl .row-mom .sticky-col {
+  font-size:11px;
+  font-style:italic;
+  color:var(--text3);
+}
+
+/* JAMI total row */
+.mrr-tbl .row-total td {
+  background:var(--bg3);
+  font-weight:800;
+  font-size:13px;
+  font-family:var(--mono);
+  color:var(--text);
+  padding:11px 14px;
+  border-bottom:2px solid var(--border);
+  border-top:2px solid var(--border);
+}
+.mrr-tbl .row-total .sticky-col {
+  font-family:var(--font);
+  font-size:12px;
+  letter-spacing:.2px;
+}
+
+/* ── ROW HOVER ── */
+.mrr-tbl tbody tr:hover td {
+  background:var(--bg4) !important;
+}
+.mrr-tbl tbody tr:hover .mcell-g {
+  background:rgba(17,122,82,0.10) !important;
+}
+.mrr-tbl tbody tr:hover .mcell-y {
+  background:rgba(163,98,7,0.10) !important;
+}
+.mrr-tbl tbody tr:hover .sticky-col {
+  background:var(--bg3) !important;
+}
+
+/* Last row: no bottom border */
+.mrr-tbl tbody tr:last-child td {
+  border-bottom:none;
+}
 
 /* MRR Tooltip */
 .mrr-tip{

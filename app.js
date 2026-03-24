@@ -16,151 +16,121 @@ function dashRange(){
       const mos=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
       const span=(to.getFullYear()-from.getFullYear())*12+(to.getMonth()-from.getMonth());
       return span>11?mos[d.getMonth()]+' '+(d.getFullYear()%100):mos[d.getMonth()];
-    });
-    const {all,qAll}=buildContracts();const totals=[],cpmArr=[];
-    const newPerPt=[],churnPerPt=[],newMrrArr=[],churnMrrArr=[],expMrrArr=[],conMrrArr=[];
+    }); const {all, qAll} = buildContracts();
+    const allData = all.concat(qAll).filter(c=>c.musd>0);
+    const names = [...new Set(allData.map(c=>c.client))];
+    const now = new Date();
+
+    const getMRR = (name, date) => allData.filter(c=>c.client===name && c.st<=date && c.endD>=date).reduce((s,x)=>s+x.musd,0);
     
-    function getBinMax(start, end) {
-        const cMap = {};
-        const process = cts => { cts.forEach(ct => { if(ct.musd<=0) return; if(ct.st<=end && ct.endD>=start){if(!cMap[ct.client])cMap[ct.client]=[];cMap[ct.client].push(ct)} }) };
-        process(all); process(qAll);
+    const baseDate = new Date(from.getFullYear(), from.getMonth(), from.getDate()-1); 
+    const nextDay = from;
+
+    const clientMeta = {};
+    names.forEach(name => {
+        const cts = allData.filter(c=>c.client===name);
+        const firstEver = cts.reduce((a,c)=>c.st < a.st ? c : a);
+        const lastEver = cts.reduce((a,c)=>c.endD > a.endD ? c : a);
         
-        let total = 0; const active = new Set(); const maxVals = {};
-        Object.entries(cMap).forEach(([client, cts]) => {
-            let maxM = 0;
-            const days = Math.round((end-start)/864e5)+1;
-            for(let i=0; i<Math.min(31, days); i++) {
-                const checkDt = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i, 23, 59, 59);
-                let dayM = 0;
-                cts.forEach(ct => { if(ct.st<=checkDt && ct.endD>=checkDt) dayM += ct.musd; });
-                if(dayM > maxM) maxM = dayM;
-            }
-            if(maxM > 0) { active.add(client); maxVals[client] = maxM; total += maxM; }
+        const mBase = getMRR(name, baseDate);
+        const mNext = getMRR(name, nextDay);
+        // Baseline: 01.01.2026 da bor bo'lgan va oldindan kelayotgan mijozlar
+        const inBase = mNext > 0 && firstEver.st < from;
+        
+        const joinedInPeriod = firstEver.st >= from && firstEver.st <= to;
+        const leftInPeriod = lastEver.endD >= from && lastEver.endD <= to;
+        const renewedSoon = allData.some(c=>c.client===name && c.st.getTime() === lastEver.endD.getTime()+864e5);
+        const actuallyLeft = leftInPeriod && !renewedSoon;
+
+        let cat = 'Other';
+        if(joinedInPeriod && actuallyLeft) cat = 'Transient';
+        else if(joinedInPeriod) cat = 'New';
+        else if(actuallyLeft && inBase) cat = 'Churn';
+        else if(inBase) cat = 'Retained';
+        else if(firstEver.st < from && getMRR(name, now) > 0) cat = 'Resurrected';
+        
+        clientMeta[name] = {cat, firstEver, lastEver, mrrBase: inBase ? mNext : 0};
+    });
+
+    const newClients=[], churnClients=[], expClients=[];
+    const seenNew=new Set(), seenChurn=new Set(), seenExp=new Set();
+    let startMRRsum = 0, exactBaseClients = 0;
+    const newPerPt=[],churnPerPt=[],newMrrArr=[],churnMrrArr=[],expMrrArr=[],conMrrArr=[],totals=[],cpmArr=[];
+
+    points.forEach((pt, i) => {
+        const binStart = gran==='day' ? new Date(pt) : new Date(pt.getFullYear(), pt.getMonth(), 1);
+        let binEnd = gran==='day' ? new Date(pt) : new Date(pt.getFullYear(), pt.getMonth()+1, 0, 23, 59, 59);
+        let binOut = gran==='day' ? new Date(pt.getFullYear(), pt.getMonth(), pt.getDate() + 1) : new Date(pt.getFullYear(), pt.getMonth()+1, 1);
+        
+        if(binEnd > now) binEnd = now;
+        if(binOut > now) binOut = now;
+        
+        const sSnap = mrrOnDate(binStart, all, qAll);
+        const eSnap = mrrOnDate(binOut, all, qAll);
+        
+        let newM=0, churnM=0, expM=0, conM=0;
+        let newCount=0, churnCount=0;
+        
+        totals.push(Math.round(eSnap.total));
+        cpmArr.push(eSnap.active.size);
+        
+        names.forEach(name => {
+           const meta = clientMeta[name];
+           if (meta.cat === 'Other') return;
+
+           const mStart = sSnap.contracts.filter(c=>c.client===name).reduce((s,x)=>s+x.musd,0);
+           const mEnd = eSnap.contracts.filter(c=>c.client===name).reduce((s,x)=>s+x.musd,0);
+           const delta = mEnd - mStart;
+           const mgr = (meta.lastEver||{}).mgr||'';
+
+           // === ATRIBUCIYA (Confirmed Spec) ===
+           if (meta.cat === 'New' || meta.cat === 'Transient') {
+              if (delta > 0) newM += delta;
+              if (meta.cat === 'Transient' && delta < 0) churnM += Math.abs(delta);
+              
+              if (!seenNew.has(name) && delta > 0) {
+                 seenNew.add(name);
+                 newClients.push({name, date: meta.firstEver.st, mgr, mrr: Math.round(getMRR(name, now)), isRechurn: false, hudud: meta.firstEver.hudud||'', dur: meta.firstEver.dur||0, tUSD: meta.firstEver.tUSD||0});
+              }
+              if (meta.cat === 'Transient' && !seenChurn.has(name) && delta < 0) {
+                 seenChurn.add(name);
+                 churnClients.push({name, date: meta.lastEver.endD, mgr, mrr: Math.round(mStart), izoh: 'Joined & Left in period'});
+              }
+           }
+           else if (meta.cat === 'Churn') {
+              const isDeparture = meta.lastEver.endD >= binStart && meta.lastEver.endD <= binEnd;
+              if (isDeparture) {
+                 churnM += mStart; churnCount++;
+                 if (!seenChurn.has(name)) {
+                    seenChurn.add(name);
+                    churnClients.push({name, date: meta.lastEver.endD, mgr, mrr: Math.round(meta.mrrBase), izoh: ''});
+                 }
+              } else { churnM -= delta; } 
+           }
+           else { // Retained yoki Resurrected
+              if (Math.abs(delta) > 1) {
+                 if (delta > 0) expM += delta; else conM += Math.abs(delta);
+                 if (!seenExp.has(name)) {
+                    seenExp.add(name);
+                    const mToday = getMRR(name, now);
+                    expClients.push({name, mrrStart: Math.round(meta.mrrBase), mrrEnd: Math.round(mToday), delta: Math.round(mToday - meta.mrrBase), mgr, date: binStart});
+                 }
+              }
+           }
+           if (i === 0 && meta.mrrBase > 0) { startMRRsum += meta.mrrBase; exactBaseClients++; }
         });
-        return { total, active, maxVals };
-    }
-    
-    const beforeStart = gran==='day' ? new Date(from.getFullYear(), from.getMonth(), from.getDate()-1) : new Date(from.getFullYear(), from.getMonth()-1, 1);
-    const beforeEnd = gran==='day' ? new Date(from.getFullYear(), from.getMonth(), from.getDate()-1, 23, 59, 59) : new Date(from.getFullYear(), from.getMonth(), 0, 23, 59, 59);
-    const beforeSnap = getBinMax(beforeStart, beforeEnd);
-    
-    const snaps = points.map(pt => {
-        let bS, bE;
-        if(gran==='day') { bS=new Date(pt.getFullYear(), pt.getMonth(), pt.getDate()); bE=new Date(pt.getFullYear(), pt.getMonth(), pt.getDate(), 23, 59, 59); }
-        else { bS=new Date(pt.getFullYear(), pt.getMonth(), 1); bE=new Date(pt.getFullYear(), pt.getMonth()+1, 0, 23, 59, 59); }
-        if(bE>to) bE=new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59);
-        return getBinMax(bS, bE);
-    });
-    
-    snaps.forEach(s => { totals.push(Math.round(s.total)); cpmArr.push(s.active.size); });
-    
-    for(let i=0; i<snaps.length; i++) {
-      const prev=i===0?beforeSnap:snaps[i-1];
-      const cur=snaps[i];
-      
-      const newOnes=[...cur.active].filter(n=>!prev.active.has(n));
-      const gone=[...prev.active].filter(n=>!cur.active.has(n));
-      const retained=[...cur.active].filter(n=>prev.active.has(n));
-      
-      newPerPt.push(newOnes.length);
-      churnPerPt.push(gone.length);
-      
-      let newM=0, churnM=0, expM=0, conM=0;
-      
-      newOnes.forEach(n=> { newM += cur.maxVals[n] });
-      gone.forEach(n=> { churnM += prev.maxVals[n] });
-      retained.forEach(n=>{
-         const curM = cur.maxVals[n]||0;
-         const prevM = prev.maxVals[n]||0;
-         const diff = curM - prevM;
-         if(diff > 0) expM += diff;
-         else if(diff < 0) conM += Math.abs(diff);
-      });
-      
-      newMrrArr.push(newM);
-      churnMrrArr.push(churnM);
-      expMrrArr.push(expM);
-      conMrrArr.push(conM);
-    }
-
-    // === EVENT-BASED DELTA METRICS ===
-    const byClient={};
-    all.forEach(ct=>{if(!byClient[ct.client])byClient[ct.client]=[];byClient[ct.client].push(ct)});
-    qAll.forEach(ct=>{if(!byClient[ct.client])byClient[ct.client]=[];byClient[ct.client].push({...ct,isQ:true})});
-
-    const newClients=[],churnClients=[],expClients=[];
-    let startMRRsum = 0;
-    let exactBaseClients = 0;
-
-    // Chegara nuqtalarini tayyorlaymiz
-    const dayBefore = new Date(from.getFullYear(), from.getMonth(), from.getDate() - 1);
-    const firstDay = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-    const lastDay = new Date(to.getFullYear(), to.getMonth(), to.getDate());
-    const dayAfter = new Date(to.getFullYear(), to.getMonth(), to.getDate() + 1);
-
-    Object.keys(byClient).forEach(name=>{
-      const cts = byClient[name].filter(c=>c.musd>0);
-      if(!cts.length)return;
-      
-      const isActive = (date) => cts.some(c => c.st <= date && c.endD >= date);
-      
-      // bsl: Mijoz davr boshida biz bilan ulanib kiryapti. (uzilishsiz)
-      const bsl = isActive(dayBefore) && isActive(firstDay);
-      
-      // out: Mijoz davr oxiridan kegin ham uzilishsiz davom etyapti.
-      const out = isActive(lastDay) && isActive(dayAfter);
-      
-      // dur: Mijoz shu davrning o'zida qachondir aktiv bo'lgan.
-      const dur = cts.some(c => c.st <= to && c.endD >= from);
-      
-      if(!dur && !bsl && !out) return; 
-      
-      const activeIn = cts.filter(c => c.st <= firstDay && c.endD >= firstDay);
-      const activeOut = cts.filter(c => c.st <= lastDay && c.endD >= lastDay);
-      const activeDur = cts.filter(c => c.st <= to && c.endD >= from);
-      
-      const mrrS = bsl ? activeIn.reduce((s,c)=>s+c.musd,0) : 0;
-      const mrrE = out ? activeOut.reduce((s,c)=>s+c.musd,0) : 0;
-      
-      if(bsl){
-         startMRRsum += mrrS;
-         exactBaseClients++;
-      }
-      
-      // MUKAMMAL SIMMETRIYA:
-      const isNew = dur && !bsl;   // Davrda bor, lekin uzilishsiz kirmagan
-      const isChurn = dur && !out; // Davrda bor, lekin uzilishsiz chiqmadi
-      const isRetained = bsl && out; // Davr boshida ham, oxirida ham bor
-
-      
-      const mgr = (cts[cts.length-1]||{}).mgr||'';
-      
-      if(isNew){
-        const startedInPeriod=activeDur.filter(c=>c.st>=from&&c.st<=to).sort((a,b)=>b.st-a.st);
-        const ct = startedInPeriod[0] || activeDur[0];
-        const firstEver = cts.reduce((a,c)=>c.st<a.st?c:a,cts[0]);
-        const hadBefore = firstEver.st < from;
-        const wasActiveJustBefore = cts.some(c=>c.endD>=new Date(from.getTime()-2*864e5)&&c.st<from);
-        const isRechurn = hadBefore && !wasActiveJustBefore;
         
-        newClients.push({name,date:ct.st,mgr:ct.mgr||mgr,mrr:out?Math.round(mrrE):Math.round(ct.musd),isRechurn,hudud:ct.hudud||'',dur:ct.dur||0,tUSD:ct.tUSD||0,sUSD:ct.sUSD||0,izoh:ct.izoh||'',raqami:ct.raqami||''});
-      }
-      
-      if(isChurn){
-        const endedInPeriod=activeDur.filter(c=>c.endD<=to).sort((a,b)=>b.endD-a.endD);
-        const ct = endedInPeriod[0] || activeDur[0];
-        churnClients.push({name,date:ct.endD,mgr:ct.mgr||mgr,mrr:Math.round(bsl?mrrS:ct.musd),izoh:ct.izoh||''});
-      }
-      
-      if(isRetained && Math.abs(mrrE-mrrS)>1){
-        expClients.push({name,mrrStart:Math.round(mrrS),mrrEnd:Math.round(mrrE),delta:Math.round(mrrE-mrrS),mgr});
-      }
+        newMrrArr.push(Math.round(newM));
+        churnMrrArr.push(Math.round(churnM));
+        expMrrArr.push(Math.round(expM));
+        conMrrArr.push(Math.round(conM));
+        newPerPt.push(newCount);
+        churnPerPt.push(churnCount);
     });
 
-    newClients.sort((a,b)=>b.date-a.date);churnClients.sort((a,b)=>b.date-a.date);
-    expClients.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
-    const baseTotal=Math.round(startMRRsum);
-    return{labels,totals,cpmArr,newPerPt,churnPerPt,addedMRR:newMrrArr,lostMRR:churnMrrArr,expMRR:expMrrArr,conMRR:conMrrArr,newClients,churnClients,expClients,gran,points,baseMRR:baseTotal,baseClients:exactBaseClients};
+    newClients.sort((a,b)=>b.date-a.date); churnClients.sort((a,b)=>b.date-a.date);
+    expClients.sort((a,b)=>b.date-a.date);
+    return {labels, totals, cpmArr, newPerPt, churnPerPt, addedMRR: newMrrArr, lostMRR: churnMrrArr, expMRR: expMrrArr, conMRR: conMrrArr, newClients, churnClients, expClients, gran, points, baseMRR: Math.round(startMRRsum), baseClients: exactBaseClients};
   });
 }
 
@@ -297,15 +267,46 @@ function calcCumExpected(year){
 
 // === RENDER ===
 let _rdT;function render(){clearTimeout(_rdT);_rdT=setTimeout(_render,0)}
+let _lastSec=null;
 function _render(){
   if(!S.rows.length){showWelcome();return}
   const ae=document.activeElement;const isInput=ae&&ae.tagName==='INPUT'&&ae.type==='text';
   const sel=isInput?{s:ae.selectionStart,e:ae.selectionEnd,sec:S.sec,ph:ae.placeholder}:null;
   const f={dashboard:rD,contracts:rC,mrrtable:rMRR,managers:rM,clients:rCl,topmrr:rT,debts:rDebt};
+  // Save scroll positions before re-render
+  const tbl=document.querySelector('.tbl-scroll');
+  const savedTop=tbl?tbl.scrollTop:0;
+  const savedLeft=tbl?tbl.scrollLeft:0;
   const root=document.getElementById('root');
-  root.innerHTML='<div class="page-enter">'+(f[S.sec]||rD)()+'</div>';
+  const secChanged=_lastSec!==S.sec;
+  _lastSec=S.sec;
+  const html=(f[S.sec]||rD)();
+  root.innerHTML=secChanged?'<div class="page-enter">'+html+'</div>':html;
   iC();
+  // Restore scroll positions after re-render (prevents jitter)
+  if(!secChanged&&(savedTop>0||savedLeft>0)){
+    requestAnimationFrame(()=>{const t=document.querySelector('.tbl-scroll');if(t){t.scrollTop=savedTop;t.scrollLeft=savedLeft;}});
+  }
+  if(S.sec==='dashboard')requestAnimationFrame(animateNumbers);
   if(sel&&sel.sec===S.sec){const inp=document.querySelector('input[placeholder="'+sel.ph+'"]');if(inp){inp.focus();inp.setSelectionRange(sel.s,sel.e)}}
+}
+
+function animateNumbers(){
+  document.querySelectorAll('.anim-val').forEach(el=>{
+    const end=parseFloat(el.dataset.val)||0;
+    const isFmt=el.dataset.fmt==='1';
+    const isSign=el.dataset.sign==='1';
+    if(end===0){el.textContent=isFmt?fmt(0):'0';return}
+    const dur=800,st=performance.now();
+    const update=t=>{
+      let p=(t-st)/dur;if(p>1)p=1;
+      const cur=end*(p===1?1:1-Math.pow(2,-10*p));
+      let txt=isFmt?((isSign&&cur>0?'+':'')+fmt(Math.round(cur))):Math.round(cur).toString();
+      el.textContent=txt;
+      if(p<1)requestAnimationFrame(update);
+    };
+    requestAnimationFrame(update);
+  });
 }
 
 // === PAGINATION ===
