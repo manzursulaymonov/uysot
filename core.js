@@ -3,7 +3,8 @@
    ============================================================ */
 
 // === STATE ===
-const S={rows:[],qRows:[],payRows:[],y2024Rows:[],perevodRows:[],config:null,sec:'dashboard',cP:0,cN:40,cQ:'',cS:'',cM:'',cR:'',mP:0,mN:40,mQ:'',clP:0,clN:40,clQ:'',mrrP:0,mrrQ:'',mrrYear:2026,dashPre:'y',dashFrom:new Date(2026,0,1),dashTo:new Date(),mrrCols:{mgr:true,hudud:false,mrr:false,deal:false,end:false},mrrSet:false,debtDate:new Date(),apiKey:localStorage.getItem('uysot_apikey')||'',geminiKey:localStorage.getItem('uysot_geminikey')||'',aiProvider:localStorage.getItem('uysot_ai')||'none',repSec:null,_cache:{}};
+let _sc=localStorage.getItem('uysot_cards'); _sc=_sc?JSON.parse(_sc):{mrr:{s:1,arr:1,g:1},nrr:{s:1,n:1,c:1,e:1},cust:{s:1,g:1,c:1},arpa:{s:1,g:1},cac:{s:0,d:1}};
+const S={rows:[],qRows:[],payRows:[],y2024Rows:[],perevodRows:[],config:null,sec:'dashboard',cP:0,cN:40,cQ:'',cS:'',cM:'',cR:'',mP:0,mN:40,mQ:'',clP:0,clN:40,clQ:'',mrrP:0,mrrQ:'',mrrYear:2026,dashPre:'y',dashFrom:new Date(2026,0,1),dashTo:new Date(),mrrCols:{mgr:true,hudud:false,mrr:false,deal:false,end:false},mrrSet:false,debtDate:new Date(),apiKey:localStorage.getItem('uysot_apikey')||'',geminiKey:localStorage.getItem('uysot_geminikey')||'',aiProvider:localStorage.getItem('uysot_ai')||'none',repSec:null,dashCards:_sc,_cache:{}};
 
 // === THEME ===
 function initTheme(){
@@ -56,7 +57,7 @@ function cached(key,fn){
 // === UTILS ===
 function pn(s){return parseFloat((s||'').replace(/[$\s]/g,'').replace(/,/g,''))||0}
 function fmt(n){return n?Math.round(n).toLocaleString('en-US').replace(/,/g,' '):'—'}
-function fk(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?Math.round(n/1000)+'k':Math.round(n)}
+function fk(n){const a=Math.abs(n);if(a>=1e6)return(n/1e6).toFixed(1).replace(/\.0$/,'')+'M';if(a>=1000)return(n/1000).toFixed(1).replace(/\.0$/,'')+'K';return Math.round(n)}
 function fmtD(d){const dd=d.getDate(),mm=d.getMonth()+1,yy=d.getFullYear()%100;return(dd<10?'0':'')+dd+'.'+(mm<10?'0':'')+mm+'.'+yy}
 function pd(s){if(!s)return null;let p=s.split('.');if(p.length===3)return new Date(+p[2],+p[1]-1,+p[0]);p=s.split('-');if(p.length===3)return new Date(+p[2],+p[1]-1,+p[0]);return null}
 
@@ -105,11 +106,41 @@ function buildContracts(){
 function mrrOnDate(dt,allCts,qCts){
   let total=0;const active=new Set();const contracts=[];
   allCts.forEach(ct=>{if(ct.st<=dt&&ct.endD>=dt&&ct.musd>0){total+=ct.musd;active.add(ct.client);contracts.push(ct)}});
-  qCts.forEach(ct=>{if(ct.st<=dt&&ct.endD>=dt&&ct.musd){total+=ct.musd;if(ct.musd>0){active.add(ct.client);contracts.push(ct)}}});
+  qCts.forEach(ct=>{if(ct.st<=dt&&ct.endD>=dt&&ct.musd!==0){total+=ct.musd;active.add(ct.client);contracts.push(ct)}});
   return{total:Math.round(total),active,contracts};
 }
 
 // === DEBT TABLE ===
+// === LAST PAYMENTS ===
+function calcLastPayments(){
+  return cached('lastPayments',()=>{
+    const lp={};
+    const proc=(rows,dateK,origSK,usdSK,typeK,kassaK,valK,defType)=>{
+      if(!rows)return;
+      rows.forEach(r=>{
+        const c=r.Client?.trim();if(!c)return;
+        const dStr=r[dateK];if(!dStr)return;
+        const d=pd(dStr);if(!d)return;
+        const origSum=(r[origSK]||'0').trim();
+        const usdSum=pn(r[usdSK]||'0');
+        const type=(r[typeK]||defType||'').toLowerCase();
+        const kassa=r[kassaK]||'';
+        const val=(r[valK]||(type==='perevod'?'UZS':'USD')).toUpperCase();
+        if(!lp[c]||d>lp[c].date){
+          lp[c]={date:d,dateStr:dStr,allOnDate:[]};
+        }
+        if(lp[c]&&d.getTime()===lp[c].date.getTime()){
+          lp[c].allOnDate.push({origSum,usdSum,type,kassa,val});
+        }
+      });
+    };
+    proc(S.payRows,'sanasi','summasi','USD','tolov turi','kassa','Valyuta','');
+    proc(S.perevodRows,'Sanasi','Tolov','Tolov(usd)','izoh','','','perevod');
+    // For y24 we just fallback to generic sums if needed
+    return lp;
+  });
+}
+
 function calcDebtTable(reportDate){
   if(!reportDate)reportDate=new Date();
   const repMonthEnd=new Date(reportDate.getFullYear(),reportDate.getMonth()+1,0);
@@ -218,7 +249,8 @@ function calcDebtTable(reportDate){
       });
     }
     const kelQarz=Math.round(kelExp-paid);
-    if(qoldiq>1||oyQarz>1||kelQarz>1)result.push({name:cl.name,firma:cl.firma,qoldiq,oyQarz,kelQarz,totalSum:Math.round(cl.totalSum),paid:Math.round(paid)});
+    const lastP=calcLastPayments();const lp=lastP[cl.name]||null;
+    if(qoldiq>1||oyQarz>1||kelQarz>1)result.push({name:cl.name,firma:cl.firma,qoldiq,oyQarz,kelQarz,totalSum:Math.round(cl.totalSum),paid:Math.round(paid),lastPay:lp});
   });
   result.sort((a,b)=>b.kelQarz-a.kelQarz);return result;
 }

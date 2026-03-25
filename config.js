@@ -207,7 +207,46 @@ ${sections.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding
 <button class="btn" onclick="this.closest('.overlay').remove()">Bekor</button>
 <button class="btn btn-primary" style="padding:9px 24px" onclick="this.closest('.overlay').remove();generateReport()">Shaklantirish</button>
 </div></div>`;document.body.appendChild(o)}
-
+function showDashSettingsModal(){
+  const o=document.createElement('div');o.className='overlay';o.onclick=e=>{if(e.target===o)o.remove()};
+  const c=S.dashCards||{};
+  const up=(g,k,v,el)=>{if(!S.dashCards[g])S.dashCards[g]={};S.dashCards[g][k]=v;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));if(window.render)render();if(el){el.style.opacity=v?1:0.5;el.style.pointerEvents=v?'auto':'none'}};
+  o.innerHTML=`<div class="modal" style="max-width:400px">
+  <h2 style="display:flex;align-items:center;gap:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Dashboard Kartalar sozlamasi</h2>
+  <div class="sub" style="margin-bottom:16px">Qaysi ko'rsatgichlar asosiy ekranda chiqishini belgilang</div>
+  <div class="mrr-set" style="display:flex;flex-direction:column;gap:12px;max-height:65vh;overflow-y:auto;padding-right:4px">
+    <div style="background:var(--bg3);padding:10px;border-radius:8px">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:pointer"><input type="checkbox" ${c.mrr?.s?'checked':''} onchange="const d=this.closest('div').querySelector('.s-opts');if(!S.dashCards.mrr)S.dashCards.mrr={};S.dashCards.mrr.s=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render();d.style.opacity=this.checked?1:0.5;d.style.pointerEvents=this.checked?'auto':'none'">1. MRR</label>
+      <div class="s-opts" style="margin-left:24px;margin-top:6px;display:flex;flex-direction:column;gap:6px;opacity:${c.mrr?.s?1:0.5};pointer-events:${c.mrr?.s?'auto':'none'}">
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.mrr?.g?'checked':''} onchange="S.dashCards.mrr.g=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">O'sish foizi (Growth)</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.mrr?.arr?'checked':''} onchange="S.dashCards.mrr.arr=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">ARR (Yillik daromad)</label>
+      </div></div>
+    <div style="background:var(--bg3);padding:10px;border-radius:8px">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:pointer"><input type="checkbox" ${c.nrr?.s?'checked':''} onchange="const d=this.closest('div').querySelector('.s-opts');if(!S.dashCards.nrr)S.dashCards.nrr={};S.dashCards.nrr.s=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render();d.style.opacity=this.checked?1:0.5;d.style.pointerEvents=this.checked?'auto':'none'">2. NRR</label>
+      <div class="s-opts" style="margin-left:24px;margin-top:6px;display:flex;flex-direction:column;gap:6px;opacity:${c.nrr?.s?1:0.5};pointer-events:${c.nrr?.s?'auto':'none'}">
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.nrr?.n?'checked':''} onchange="S.dashCards.nrr.n=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">New (Yangi/Qayta)</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.nrr?.e?'checked':''} onchange="S.dashCards.nrr.e=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">Net Exp (Kengayish qoldig'i)</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.nrr?.c?'checked':''} onchange="S.dashCards.nrr.c=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">Churn (Sop-pa soqqa chiqim)</label>
+      </div></div>
+    <div style="background:var(--bg3);padding:10px;border-radius:8px">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:pointer"><input type="checkbox" ${c.cust?.s?'checked':''} onchange="const d=this.closest('div').querySelector('.s-opts');if(!S.dashCards.cust)S.dashCards.cust={};S.dashCards.cust.s=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render();d.style.opacity=this.checked?1:0.5;d.style.pointerEvents=this.checked?'auto':'none'">3. Active Customers</label>
+      <div class="s-opts" style="margin-left:24px;margin-top:6px;display:flex;flex-direction:column;gap:6px;opacity:${c.cust?.s?1:0.5};pointer-events:${c.cust?.s?'auto':'none'}">
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.cust?.g?'checked':''} onchange="S.dashCards.cust.g=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">Sof o'sish dinamikasi</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.cust?.ch?'checked':''} onchange="S.dashCards.cust.ch=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">Churn Rate (Ketish xavfi)</label>
+      </div></div>
+    <div style="background:var(--bg3);padding:10px;border-radius:8px">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:pointer"><input type="checkbox" ${c.arpa?.s?'checked':''} onchange="const d=this.closest('div').querySelector('.s-opts');if(!S.dashCards.arpa)S.dashCards.arpa={};S.dashCards.arpa.s=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render();d.style.opacity=this.checked?1:0.5;d.style.pointerEvents=this.checked?'auto':'none'">4. ARPA</label>
+      <div class="s-opts" style="margin-left:24px;margin-top:6px;display:flex;flex-direction:column;gap:6px;opacity:${c.arpa?.s?1:0.5};pointer-events:${c.arpa?.s?'auto':'none'}">
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.arpa?.g?'checked':''} onchange="S.dashCards.arpa.g=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">O'sish dinamikasi</label>
+      </div></div>
+    <div style="background:var(--bg3);padding:10px;border-radius:8px;opacity:0.6">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:not-allowed;color:var(--text3)"><input type="checkbox" disabled ${c.cac?.s?'checked':''}>5. CAC</label>
+      <div style="margin-left:24px;margin-top:4px;font-size:10px;color:var(--text3)">Hozircha xarajatlar bazasi ulanmaganligi sababli ushbu karta yopiq.</div>
+    </div>
+  </div>
+  <div style="margin-top:16px"><button class="btn btn-primary w-100" style="padding:10px" onclick="this.closest('.overlay').remove()">Saqlash va Yopish</button></div>
+  </div>`;document.body.appendChild(o);
+}
 // === DATA LOADING ===
 async function fetchCsv(url,label){
   console.log('['+label+'] Yuklanmoqda: '+url);
