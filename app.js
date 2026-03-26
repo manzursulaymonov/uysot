@@ -746,10 +746,26 @@ function onSearch(field,val){S[field]=val;S.cP=0;S.clP=0;_debouncedSearch()}
 
 // === NAV ===
 function initNav(){
+  const mrrSub=document.getElementById('mrr-sub');
   document.querySelectorAll('.nav-item').forEach(el=>el.addEventListener('click',()=>{
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-    el.classList.add('active');S.sec=el.dataset.sec;clearCache();render();closeSidebar();
+    el.classList.add('active');
+    S.sec=el.dataset.sec;
+    if(mrrSub){
+      if(S.sec==='mrrtable'){mrrSub.classList.add('open')}
+      else{mrrSub.classList.remove('open')}
+    }
+    clearCache();render();closeSidebar();
   }));
+  if(mrrSub){
+    mrrSub.querySelectorAll('.nav-sub-item').forEach(el=>el.addEventListener('click',e=>{
+      e.stopPropagation();
+      mrrSub.querySelectorAll('.nav-sub-item').forEach(n=>n.classList.remove('active'));
+      el.classList.add('active');
+      S.mrrView=el.dataset.view;
+      render();
+    }));
+  }
 }
 
 function showMgrStats(mgrName) {

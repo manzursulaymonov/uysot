@@ -380,8 +380,208 @@ return`<tr><td class="mono" style="font-size:10px;color:var(--text3)">${r.raqami
   return h;
 }
 
+// === MRR SUB-VIEW HELPERS ===
+function _mrrToolbar(yr){
+  return`<div class="toolbar" style="margin-bottom:12px;gap:10px">
+  <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input placeholder="Mijoz, menejer, hudud..." value="${S.mrrQ||''}" oninput="onSearch('mrrQ',this.value)"></div>
+  <div style="display:flex;gap:4px">${[yr-1,yr,yr+1].map(y=>`<button class="btn${y===yr?' btn-primary':''}" style="padding:7px 16px;font-size:13px;font-weight:600" onclick="S.mrrYear=${y};clearCache();render()">${y}</button>`).join('')}</div>
+  </div>`;
+}
+function _sparkSVG(monthly,w,h){
+  w=w||100;h=h||26;
+  const max=Math.max(...monthly,1);
+  const pts=monthly.map((v,i)=>{
+    const x=Math.round(i/11*(w-4))+2;
+    const y=v>0?Math.round((h-4)-(v/max*(h-8)))+2:(h-2);
+    return x+','+y;
+  }).join(' ');
+  const dots=monthly.map((v,i)=>{
+    if(!v)return'';
+    const x=Math.round(i/11*(w-4))+2, y=Math.round((h-4)-(v/max*(h-8)))+2;
+    return`<circle cx="${x}" cy="${y}" r="2" fill="var(--accent)" opacity="0.7"/>`;
+  }).join('');
+  return`<svg width="${w}" height="${h}" style="display:block;overflow:visible"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
+}
+function _trendArrow(monthly,curM){
+  const cur=monthly[curM]||0, p=monthly[Math.max(0,curM-2)]||0;
+  if(!cur&&!p)return'<span style="color:var(--text3)">—</span>';
+  const d=p>0?Math.round((cur-p)/p*100):0;
+  if(d>10)return`<span style="color:var(--green)">↑ +${d}%</span>`;
+  if(d>2)return`<span style="color:var(--green)">↗ +${d}%</span>`;
+  if(d>=-2)return`<span style="color:var(--text3)">→ ${d}%</span>`;
+  if(d>=-10)return`<span style="color:var(--amber)">↘ ${d}%</span>`;
+  return`<span style="color:var(--red)">↓ ${d}%</span>`;
+}
+
+// === MRR SPARKLINE VIEW ===
+function rMRRSparkline(){
+  const yr=S.mrrYear||2026;const d=mrrData(yr);
+  const now=new Date();const curM=now.getFullYear()===yr?now.getMonth():(yr<now.getFullYear()?11:0);
+  let filtered=[...d.clients];
+  if(S.mrrQ){const q=S.mrrQ.toLowerCase();filtered=filtered.filter(c=>c.name.toLowerCase().includes(q)||(c.mgr||'').toLowerCase().includes(q)||(c.hudud||'').toLowerCase().includes(q))}
+  const rows=filtered.map(c=>{
+    const isActive=c.monthly[curM]>0;
+    const badge=isActive?'<span class="badge b-green" style="font-size:10px">Aktiv</span>':'<span class="badge" style="font-size:10px;background:var(--bg3);color:var(--text3)">Tugadi</span>';
+    return`<tr>
+      <td style="font-weight:500">${c.name}</td>
+      <td style="font-size:12px;color:var(--text2)">${c.mgr||'—'}</td>
+      <td class="text-r mono" style="font-weight:700;color:${isActive?'var(--accent2)':'var(--text3)'}">${c.mrr?fmt(c.mrr):'—'}</td>
+      <td style="padding:4px 8px;min-width:110px">${_sparkSVG(c.monthly)}</td>
+      <td style="font-size:12px;min-width:80px">${_trendArrow(c.monthly,curM)}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+  return _mrrToolbar(yr)+`<div class="card"><div class="card-body" style="padding:0">
+  <div class="tbl-scroll" style="max-height:calc(100vh - 160px)"><table><thead><tr>
+    <th>Mijoz nomi</th><th>Menejer</th><th class="text-r">Joriy MRR</th>
+    <th>${yr} yil sparkline</th><th>3-oy trend</th><th>Holat</th>
+  </tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">Ma\'lumot yo\'q</td></tr>'}</tbody></table></div>
+  </div></div>`;
+}
+
+// === MRR HEATMAP VIEW ===
+function rMRRHeatmap(){
+  const yr=S.mrrYear||2026;const d=mrrData(yr);
+  const mos=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+  let filtered=[...d.clients];
+  if(S.mrrQ){const q=S.mrrQ.toLowerCase();filtered=filtered.filter(c=>c.name.toLowerCase().includes(q)||(c.mgr||'').toLowerCase().includes(q)||(c.hudud||'').toLowerCase().includes(q))}
+  const rows=filtered.map(c=>{
+    const peak=Math.max(...c.monthly,1);
+    const cells=c.monthly.map(v=>{
+      if(!v)return'<td class="mcell" style="color:var(--text3);opacity:0.4">—</td>';
+      const ratio=v/peak;
+      const bg=`rgba(23,70,162,${(ratio*0.72+0.1).toFixed(2)})`;
+      const col=ratio>0.45?'#fff':'var(--accent)';
+      return`<td class="mcell" style="background:${bg};color:${col};font-weight:600;font-size:11px;border-radius:4px">${fmt(v)}</td>`;
+    }).join('');
+    return`<tr><td class="sticky-col col-name" style="font-weight:500;font-size:12px">${c.name}</td>${cells}</tr>`;
+  }).join('');
+  const maxT=Math.max(...d.totals,1);
+  const totalRow='<tr class="summary-row row-total"><td class="sticky-col col-name">JAMI</td>'+d.totals.map(v=>{
+    if(!v)return'<td class="mcell">—</td>';
+    const ratio=v/maxT;const bg=`rgba(17,122,82,${(ratio*0.65+0.12).toFixed(2)})`;
+    return`<td class="mcell" style="background:${bg};color:#fff;font-weight:700;font-size:11px;border-radius:4px">${fmt(v)}</td>`;
+  }).join('')+'</tr>';
+  const legend=`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-left:auto">
+    <span>Kam</span><div style="width:72px;height:7px;border-radius:4px;background:linear-gradient(to right,rgba(23,70,162,0.12),rgba(23,70,162,0.82))"></div><span>Ko'p</span>
+  </div>`;
+  return`<div class="toolbar" style="margin-bottom:12px;gap:10px">
+  <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input placeholder="Mijoz, menejer, hudud..." value="${S.mrrQ||''}" oninput="onSearch('mrrQ',this.value)"></div>
+  <div style="display:flex;gap:4px">${[yr-1,yr,yr+1].map(y=>`<button class="btn${y===yr?' btn-primary':''}" style="padding:7px 16px;font-size:13px;font-weight:600" onclick="S.mrrYear=${y};clearCache();render()">${y}</button>`).join('')}</div>
+  ${legend}</div>
+  <div class="card"><div class="card-body" style="padding:0">
+  <div class="tbl-scroll" style="max-height:calc(100vh - 160px)"><table class="mrr-tbl"><thead><tr>
+    <th class="sticky-col col-name">Mijoz nomi</th>${mos.map(m=>`<th class="mcell">${m}</th>`).join('')}
+  </tr></thead><tbody>${totalRow}${rows}</tbody></table></div>
+  </div></div>`;
+}
+
+// === MRR CARD + TIMELINE VIEW ===
+function rMRRCard(){
+  const yr=S.mrrYear||2026;const d=mrrData(yr);
+  const now=new Date();const curM=now.getFullYear()===yr?now.getMonth():(yr<now.getFullYear()?11:0);
+  const cumExp=calcCumExpected(yr);
+  const _pm=calcPayments();const clPay={};Object.values(_pm).forEach(v=>{clPay[v.client]=(clPay[v.client]||0)+v.total});
+  let filtered=[...d.clients];
+  if(S.mrrQ){const q=S.mrrQ.toLowerCase();filtered=filtered.filter(c=>c.name.toLowerCase().includes(q)||(c.mgr||'').toLowerCase().includes(q)||(c.hudud||'').toLowerCase().includes(q))}
+  const cards=filtered.map(c=>{
+    const isActive=c.monthly[curM]>0;
+    const firstM=c.monthly.findIndex(v=>v>0);const lastM=11-[...c.monthly].reverse().findIndex(v=>v>0);
+    const barL=Math.round(firstM/12*100),barW=Math.round((lastM-firstM+1)/12*100);
+    const ce=cumExp[c.name];const paid=clPay[c.name]||0;
+    const exp=ce?(ce.cum[curM]||0):0;
+    const paidPct=exp>0?Math.min(120,Math.round(paid/exp*100)):null;
+    const pCol=paidPct==null?'var(--text3)':paidPct>=100?'var(--green)':paidPct>=70?'var(--amber)':'var(--red)';
+    const mrrCol=isActive?'var(--accent2)':'var(--text3)';
+    const mos=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+    return`<div class="card" style="padding:0">
+      <div style="padding:12px 14px 8px;display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">${c.name}</div>
+          <div style="font-size:11px;color:var(--text3)">${c.mgr||'—'}${c.hudud?' · '+c.hudud:''}</div>
+        </div>
+        <div style="text-align:right;margin-left:8px;flex-shrink:0">
+          <div class="mono" style="font-size:18px;font-weight:800;color:${mrrCol};line-height:1">${isActive?fmt(c.mrr):'—'}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:1px">$/oy</div>
+        </div>
+      </div>
+      <div style="padding:0 14px 10px">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:3px">
+          ${mos.filter((_,i)=>i%3===0).map(m=>`<span>${m}</span>`).join('')}
+        </div>
+        <div style="position:relative;height:8px;background:var(--border);border-radius:4px;margin-bottom:8px">
+          <div style="position:absolute;left:${barL}%;width:${barW}%;height:8px;border-radius:4px;background:${isActive?'var(--accent)':'var(--text3)'};opacity:${isActive?'0.85':'0.35'}"></div>
+        </div>
+        ${paidPct!=null?`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+          <span style="color:var(--text3)">${c.monthly.filter(v=>v>0).length} oy aktiv</span>
+          <span style="color:${pCol};font-weight:600">${paidPct}% to'langan</span>
+        </div>
+        <div style="height:4px;background:var(--border);border-radius:2px">
+          <div style="width:${Math.min(100,paidPct)}%;height:4px;border-radius:2px;background:${pCol}"></div>
+        </div>`:`<div style="font-size:11px;color:var(--text3)">${c.monthly.filter(v=>v>0).length} oy aktiv</div>`}
+      </div>
+      <div style="padding:6px 14px 10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:11px;color:var(--text3)">${c.dealStart||''}${c.dealEnd?' – '+c.dealEnd:''}</span>
+        ${isActive?'<span class="badge b-green" style="font-size:10px">Aktiv</span>':'<span class="badge" style="font-size:10px;background:var(--bg3);color:var(--text3)">Tugadi</span>'}
+      </div>
+    </div>`;
+  }).join('');
+  return _mrrToolbar(yr)+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
+  ${cards||'<div style="color:var(--text3);padding:24px">Ma\'lumot yo\'q</div>'}
+  </div>`;
+}
+
+// === MRR SPLIT VIEW ===
+function rMRRSplit(){
+  const yr=S.mrrYear||2026;const d=mrrData(yr);
+  const now=new Date();const curM=now.getFullYear()===yr?now.getMonth():(yr<now.getFullYear()?11:0);
+  let filtered=[...d.clients];
+  if(S.mrrQ){const q=S.mrrQ.toLowerCase();filtered=filtered.filter(c=>c.name.toLowerCase().includes(q)||(c.mgr||'').toLowerCase().includes(q)||(c.hudud||'').toLowerCase().includes(q))}
+  const active=filtered.filter(c=>c.monthly[curM]>0).sort((a,b)=>b.mrr-a.mrr);
+  const churned=filtered.filter(c=>!c.monthly[curM]).sort((a,b)=>Math.max(...b.monthly)-Math.max(...a.monthly));
+  function miniBar(monthly,peak){
+    return monthly.map(v=>{
+      if(!v)return`<span style="display:inline-block;width:6px;height:10px;background:var(--border);border-radius:2px;margin:0 0.5px;vertical-align:bottom"></span>`;
+      const h=Math.max(3,Math.round(v/peak*10));
+      return`<span style="display:inline-block;width:6px;height:${h}px;background:var(--accent);border-radius:2px;margin:0 0.5px;vertical-align:bottom;opacity:0.8"></span>`;
+    }).join('');
+  }
+  function makeSection(clients,label,accentCol,empty){
+    if(!clients.length)return`<div class="card" style="margin-bottom:12px"><div class="card-head"><span class="card-label" style="color:${accentCol}">${label}</span></div><div class="card-body" style="color:var(--text3);font-size:13px">${empty}</div></div>`;
+    const mos=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+    const rows=clients.map(c=>{
+      const peak=Math.max(...c.monthly,1);
+      const peakM=c.monthly.indexOf(peak);
+      const activeM=c.monthly.filter(v=>v>0).length;
+      return`<tr>
+        <td style="font-weight:500">${c.name}</td>
+        <td style="font-size:12px;color:var(--text2)">${c.mgr||'—'}</td>
+        <td class="text-r mono" style="font-weight:700;color:${accentCol}">${(c.monthly[curM]||peak)?fmt(c.monthly[curM]||peak):'—'}</td>
+        <td class="text-r mono" style="font-size:11px;color:var(--text3)">${fmt(peak)}<span style="font-size:10px;margin-left:3px">(${mos[peakM]})</span></td>
+        <td class="text-r" style="font-size:12px;color:var(--text3)">${activeM}/12</td>
+        <td style="font-size:13px;min-width:60px">${_trendArrow(c.monthly,curM)}</td>
+        <td style="padding:4px 8px"><div style="display:flex;align-items:flex-end;height:12px">${miniBar(c.monthly,peak)}</div></td>
+      </tr>`;
+    }).join('');
+    return`<div class="card" style="margin-bottom:12px">
+      <div class="card-head"><span class="card-label" style="color:${accentCol}">${label}</span><span class="badge" style="font-size:11px;background:${accentCol}22;color:${accentCol}">${clients.length} ta</span></div>
+      <div class="card-body" style="padding:0"><div class="tbl-scroll"><table><thead><tr>
+        <th>Mijoz</th><th>Menejer</th><th class="text-r">MRR</th><th class="text-r">Peak MRR</th><th class="text-r">Faol</th><th>Trend</th><th>Bar</th>
+      </tr></thead><tbody>${rows}</tbody></table></div></div>
+    </div>`;
+  }
+  return _mrrToolbar(yr)+
+    makeSection(active,'▶ Faol mijozlar','var(--green)','Faol mijoz yo\'q')+
+    makeSection(churned,'◼ Tugagan / Churned','var(--text3)','Tugagan mijoz yo\'q');
+}
+
 // === MRR TABLE ===
 function rMRR(){
+  const view=S.mrrView||'main';
+  if(view==='sparkline')return rMRRSparkline();
+  if(view==='heatmap')return rMRRHeatmap();
+  if(view==='card')return rMRRCard();
+  if(view==='split')return rMRRSplit();
 const yr=S.mrrYear||2026;const d=mrrData(yr);const cumExp=calcCumExpected(yr);
 const _pm=calcPayments();const clPay={};Object.values(_pm).forEach(v=>{clPay[v.client]=(clPay[v.client]||0)+v.total});
 const mos=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
