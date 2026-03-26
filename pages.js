@@ -410,13 +410,11 @@ ${cc.mrr?`<th class="text-r">MRR $</th>`:''}
 ${cc.deal?`<th class="text-c">Boshi</th>`:''}
 ${cc.end?`<th class="text-c">Tugashi</th>`:''}
 ${mos.map(m=>`<th class="mcell">${m}</th>`).join('')}
-<th class="mcell" title="Yillik jami MRR yig'indisi" style="color:var(--accent);border-left:2px solid var(--border2)">Jami</th>
 </tr></thead><tbody>
-<tr class="summary-row row-mom"><td class="sticky-col col-name" style="font-size:10.5px;color:var(--text3)">Month-over-Month %</td>${Array(exCols).fill('<td></td>').join('')}${d.mom.map(v=>{const c=v>0?'var(--green)':v<0?'var(--red)':'var(--text3)';return`<td class="mcell" style="color:${c}">${v?(v>0?'+':'')+v.toFixed(1)+'%':'—'}</td>`}).join('')}<td class="mcell" style="border-left:2px solid var(--border2)"></td></tr>
-<tr class="summary-row row-total"><td class="sticky-col col-name">Davr yig'indisi (JAMI)</td>${Array(exCols).fill('<td></td>').join('')}${d.totals.map(v=>`<td class="mcell" style="color:var(--text)">${v?fmt(v):'—'}</td>`).join('')}<td class="mcell" style="font-weight:800;color:var(--accent);border-left:2px solid var(--border2)">${fmt(d.totals.reduce((s,v)=>s+v,0))}</td></tr>
+<tr class="summary-row row-mom"><td class="sticky-col col-name" style="font-size:10.5px;color:var(--text3)">Month-over-Month %</td>${Array(exCols).fill('<td></td>').join('')}${d.mom.map(v=>{const c=v>0?'var(--green)':v<0?'var(--red)':'var(--text3)';return`<td class="mcell" style="color:${c}">${v?(v>0?'+':'')+v.toFixed(1)+'%':'—'}</td>`}).join('')}</tr>
+<tr class="summary-row row-total"><td class="sticky-col col-name">Davr yig'indisi (JAMI)</td>${Array(exCols).fill('<td></td>').join('')}${d.totals.map(v=>`<td class="mcell" style="color:var(--text)">${v?fmt(v):'—'}</td>`).join('')}</tr>
 ${filtered.map(c=>{
 const ce=cumExp[c.name];const paid=clPay[c.name]||0;
-const annualTotal=c.monthly.reduce((s,v)=>s+v,0);
 return`<tr>
 <td class="sticky-col col-name">${c.name}</td>
 ${cc.mgr?`<td style="font-size:12px;color:var(--text2)">${c.mgr||'—'}</td>`:''}
@@ -431,7 +429,6 @@ if(ce){const cur=ce.cum[m]||0;const prev=m>0?(ce.cum[m-1]||0):ce.preYear;
 if(cur>0){const remaining=Math.round(cur-paid);const paidThisMonth=Math.round(paid-prev);
 if(remaining<=1){cls='mcell mcell-g'}else if(paidThisMonth>0){cls='mcell mcell-y';tip=` data-tip="to'landi: ${fmt(paidThisMonth)} · qoldi: ${fmt(remaining)}"`}}}
 return`<td class="${cls}"${tip}>${fmt(v)}</td>`}).join('')}
-<td class="mcell" style="font-weight:700;color:var(--accent2);border-left:2px solid var(--border2)">${annualTotal?fmt(annualTotal):'—'}</td>
 </tr>`}).join('')}
 </tbody></table></div></div></div>`;
 }
