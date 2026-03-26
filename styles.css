@@ -278,6 +278,14 @@ tbody tr{transition:background var(--transition-fast)}
 .b-blue{background:var(--accent-bg);color:var(--accent)}
 .b-teal{background:var(--teal-bg);color:var(--teal)}
 .b-gray{background:var(--bg3);color:var(--text2)}
+.b-accent{background:var(--accent-bg);color:var(--accent2)}
+
+/* === DASHBOARD SETTINGS GROUPS ===
+   Used in showDashSettingsModal (config.js) */
+.dash-set-grp{margin-top:20px}
+.dash-set-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);font-weight:600;margin-bottom:8px;padding:0 2px}
+.set-item{transition:border-color var(--transition-fast)!important}
+.set-item:hover{border-color:var(--accent2)!important}
 
 /* === TOOLBAR === */
 .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}

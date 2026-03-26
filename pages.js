@@ -197,6 +197,15 @@ ${(()=>{
   ${c.nrr.n?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">New</div><div class="up" style="font-weight:600;font-size:12px;font-family:var(--mono)">+$${fk(mrrFromNew)}</div></div>`:''}
   ${c.nrr.e?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Net Exp</div><div class="${netExp>=0?'up':'dn'}" style="font-weight:600;font-size:12px;font-family:var(--mono)">${netExp>=0?'+':''}$${fk(netExp)}</div></div>`:''}
   ${c.nrr.c?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Churn</div><div class="dn" style="font-weight:600;font-size:12px;font-family:var(--mono)">-$${fk(mrrFromChurn)}</div></div>`:''}</div></div>`;
+
+  // GRR — Gross Revenue Retention (saqlanish, Expansion hisobga olinmaydi)
+  if(c.nrr?.s){
+    const grrVal=dr.grr||0;
+    const grrCol=grrVal>=95?'var(--green)':grrVal>=85?'var(--amber)':'var(--red)';
+    h+=`<div class="metric c4"><div class="metric-head"><div class="metric-lbl">GRR</div><span class="metric-info" title="Gross Revenue Retention — mavjud mijozlardan daromad saqlanishi (expansion holda). GRR ≥ 95% sog'lom, < 85% xavfli.">i</span></div>
+    <div style="display:flex;align-items:baseline;gap:8px"><div class="metric-val" style="color:${grrCol}">${grrVal.toFixed(1)}</div><span style="font-size:16px;font-weight:600;color:var(--text);margin-left:-4px">%</span></div>
+    <div class="metric-foot" style="margin-top:8px;font-size:10.5px;color:var(--text3)">Churn + Contraction yo'qotish</div></div>`;
+  }
   
   if(c.cust?.s) h+=`<div class="metric c2"><div class="metric-head"><div class="metric-lbl">Active Customers</div><span class="metric-info" onclick="showMetricInfo('cust')">i</span></div>
   <div style="display:flex;align-items:baseline;gap:8px"><div class="metric-val anim-val" data-val="${curClients}">0</div>
@@ -347,7 +356,7 @@ const hasPay=S.payRows.length||S.y2024Rows.length||S.perevodRows.length;
   
   const rn=calcRenewals();
   const ct5=rn.filter(r=>r.daysLeft<=5).length, ct10=rn.filter(r=>r.daysLeft>5&&r.daysLeft<=10).length, ct25=rn.filter(r=>r.daysLeft>10).length;
-  h += `<div class="card" style="margin-bottom:16px"><div class="card-head"><span class="card-label"><span class="dot" style="background:var(--amber)"></span>Shartnoma Kalendari — <span style="color:var(--red);font-weight:700">${ct5}</span> / <span style="color:var(--amber)">${ct10}</span> / <span style="color:var(--green)">${ct25}</span></span></div>
+  h += `<div class="card" style="margin-bottom:16px"><div class="card-head"><span class="card-label"><span class="dot" style="background:var(--amber)"></span>Shartnoma Kalendari (25 kun) — <span style="color:var(--red);font-weight:700" title="5 kun va kamroq">${ct5}</span> / <span style="color:var(--amber)" title="6–10 kun">${ct10}</span> / <span style="color:var(--green)" title="11–25 kun">${ct25}</span></span></div>
   <div class="card-body dash-new-full" style="padding:0;max-height:240px;overflow-y:auto"><table><thead><tr><th>Mijoz</th><th class="text-r">MRR</th><th class="text-r">Qoldi</th></tr></thead><tbody>`;
   if(rn.length) rn.forEach(r=>{
     const expired=r.daysLeft<0;
@@ -355,7 +364,7 @@ const hasPay=S.payRows.length||S.y2024Rows.length||S.perevodRows.length;
     const nm=expired?`<span style="text-decoration:line-through;opacity:0.6">${r.name}</span>`:r.name;
     const dl=expired?`<span style="color:var(--red);font-size:10px">Tugagan</span>`:`${r.daysLeft} kun`;
     h+=`<tr${expired?' style="opacity:0.5"':''}><td style="font-weight:600;font-size:12px">${nm}</td><td class="text-r mono" style="font-size:11px">${fmt(r.mrr)}</td><td class="text-r mono" style="font-size:11px;font-weight:700;color:${dc}">${dl}</td></tr>`;
-  }); else h+=`<tr><td colspan="3" style="text-align:center;color:var(--text3);padding:20px">90 kun ichida tugaydigan shartnoma yo'q ✅</td></tr>`;
+  }); else h+=`<tr><td colspan="3" style="text-align:center;color:var(--text3);padding:20px">25 kun ichida tugaydigan shartnoma yo'q ✅</td></tr>`;
   h+=`</tbody></table></div></div>`;
   
   h += `<div class="toolbar"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input placeholder="Mijoz, firma, INN..." value="${S.cQ}" oninput="onSearch('cQ',this.value)"></div>
@@ -400,11 +409,13 @@ ${cc.mrr?`<th class="text-r">MRR $</th>`:''}
 ${cc.deal?`<th class="text-c">Boshi</th>`:''}
 ${cc.end?`<th class="text-c">Tugashi</th>`:''}
 ${mos.map(m=>`<th class="mcell">${m}</th>`).join('')}
+<th class="mcell" title="Yillik jami MRR yig'indisi" style="color:var(--accent);border-left:2px solid var(--border2)">Jami</th>
 </tr></thead><tbody>
-<tr class="summary-row row-mom"><td class="sticky-col col-name" style="font-size:10.5px;color:var(--text3)">Month-over-Month %</td>${Array(exCols).fill('<td></td>').join('')}${d.mom.map(v=>{const c=v>0?'var(--green)':v<0?'var(--red)':'var(--text3)';return`<td class="mcell" style="color:${c}">${v?(v>0?'+':'')+v.toFixed(1)+'%':'—'}</td>`}).join('')}</tr>
-<tr class="summary-row row-total"><td class="sticky-col col-name">Davr yig'indisi (JAMI)</td>${Array(exCols).fill('<td></td>').join('')}${d.totals.map(v=>`<td class="mcell" style="color:var(--text)">${v?fmt(v):'—'}</td>`).join('')}</tr>
+<tr class="summary-row row-mom"><td class="sticky-col col-name" style="font-size:10.5px;color:var(--text3)">Month-over-Month %</td>${Array(exCols).fill('<td></td>').join('')}${d.mom.map(v=>{const c=v>0?'var(--green)':v<0?'var(--red)':'var(--text3)';return`<td class="mcell" style="color:${c}">${v?(v>0?'+':'')+v.toFixed(1)+'%':'—'}</td>`}).join('')}<td class="mcell" style="border-left:2px solid var(--border2)"></td></tr>
+<tr class="summary-row row-total"><td class="sticky-col col-name">Davr yig'indisi (JAMI)</td>${Array(exCols).fill('<td></td>').join('')}${d.totals.map(v=>`<td class="mcell" style="color:var(--text)">${v?fmt(v):'—'}</td>`).join('')}<td class="mcell" style="font-weight:800;color:var(--accent);border-left:2px solid var(--border2)">${fmt(d.totals.reduce((s,v)=>s+v,0))}</td></tr>
 ${filtered.map(c=>{
 const ce=cumExp[c.name];const paid=clPay[c.name]||0;
+const annualTotal=c.monthly.reduce((s,v)=>s+v,0);
 return`<tr>
 <td class="sticky-col col-name">${c.name}</td>
 ${cc.mgr?`<td style="font-size:12px;color:var(--text2)">${c.mgr||'—'}</td>`:''}
@@ -419,6 +430,7 @@ if(ce){const cur=ce.cum[m]||0;const prev=m>0?(ce.cum[m-1]||0):ce.preYear;
 if(cur>0){const remaining=Math.round(cur-paid);const paidThisMonth=Math.round(paid-prev);
 if(remaining<=1){cls='mcell mcell-g'}else if(paidThisMonth>0){cls='mcell mcell-y';tip=` data-tip="to'landi: ${fmt(paidThisMonth)} · qoldi: ${fmt(remaining)}"`}}}
 return`<td class="${cls}"${tip}>${fmt(v)}</td>`}).join('')}
+<td class="mcell" style="font-weight:700;color:var(--accent2);border-left:2px solid var(--border2)">${annualTotal?fmt(annualTotal):'—'}</td>
 </tr>`}).join('')}
 </tbody></table></div></div></div>`;
 }
@@ -426,16 +438,17 @@ return`<td class="${cls}"${tip}>${fmt(v)}</td>`}).join('')}
 // === MANAGERS ===
 function rM(){
   const mg=calcManagerAcquisition();
+  if(!mg.length) return`<div class="page-header"><div><div class="page-title">Menejerlar</div><div class="page-sub">Ma'lumot yuklanmagan</div></div></div><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:12px;color:var(--text3)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg><div style="font-size:14px;font-weight:600">Menejer ma'lumotlari topilmadi</div><div style="font-size:12px">Shartnomalar yuklanib, Manager ustuni to'ldirilganda bu sahifa faollashadi.</div></div>`;
   const tM=mg.reduce((s,x)=>s+x.initialMRR,0);
   const co=['#1746a2','#117a52','#c42b1c','#6941b8','#a36207','#0e7c7b','#d4537e','#5a5955','#854f0b','#993556'];
-  let h = `<div class="page-header"><div><div class="page-title">Menejerlar</div><div class="page-sub">${mg.length} ta menejer (Acquisition)</div></div></div>
+  let h = `<div class="page-header"><div><div class="page-title">Menejerlar</div><div class="page-sub">${mg.length} ta menejer · Acquisition tahlili</div></div></div>
   <div class="grid-2"><div class="card"><div class="card-head"><span class="card-label"><span class="dot" style="background:var(--accent)"></span>Olib kelingan MRR ($)</span></div><div class="card-body"><div class="chart-wrap"><canvas id="chMM"></canvas></div></div></div>
   <div class="card"><div class="card-head"><span class="card-label"><span class="dot" style="background:var(--green)"></span>Mijozlar soni</span></div><div class="card-body"><div class="chart-wrap"><canvas id="chMC"></canvas></div></div></div></div>
   <div class="tbl-wrap"><table><thead><tr><th>Menejer</th><th class="text-r">Mijozlar</th><th class="text-r">Olib kelgan MRR ($)</th><th class="text-r">O'rtacha</th><th>Ulush</th></tr></thead><tbody>${mg.map((x,i)=>{const p=tM?Math.round(x.initialMRR/tM*100):0;const av=x.clients?Math.round(x.initialMRR/x.clients):0;return`<tr><td style="font-weight:600"><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${co[i%co.length]};margin-right:7px;vertical-align:middle"></span><span class="mgr-link" onclick="showMgrStats('${x.name.replace(/'/g,"\\'")}')">${x.name}</span></td><td class="text-r mono">${x.clients}</td><td class="text-r mono" style="font-weight:600">${fmt(x.initialMRR)}</td><td class="text-r mono">${fmt(av)}</td><td><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${p}%;background:${co[i%co.length]};border-radius:3px;transition:width .5s ease"></div></div><span class="mono" style="font-size:10px;color:var(--text3);min-width:28px;text-align:right">${p}%</span></div></td></tr>`}).join('')}</tbody></table></div>`;
-  
+
   const mb=calcManagerBoard();
-  h += `<div class="card" style="margin-top:14px"><div class="card-head"><span class="card-label"><span class="dot" style="background:var(--accent2)"></span>Menejer MRR Harakati (Reyting)</span></div>
-  <div class="card-body dash-new-full" style="padding:0;max-height:340px;overflow-y:auto"><table><thead><tr><th>#</th><th>Menejer</th><th class="text-r">Yangi</th><th class="text-r col-hide">Churn</th><th class="text-r col-hide">Exp</th><th class="text-r col-hide">Con</th><th class="text-r">Sof MRR</th></tr></thead><tbody>`;
+  h += `<div class="card" style="margin-top:14px"><div class="card-head"><span class="card-label"><span class="dot" style="background:var(--accent2)"></span>Menejer MRR Harakati (Reyting) <span style="font-size:10px;color:var(--text3);font-weight:400;margin-left:6px" title="Tanlangan davr uchun har bir menejer bo'yicha MRR kirimi va chiqimi">· tanlangan davr</span></span></div>
+  <div class="card-body dash-new-full" style="padding:0;max-height:340px;overflow-y:auto"><table><thead><tr><th>#</th><th>Menejer</th><th class="text-r" title="Yangi mijozlardan kelgan MRR">Yangi</th><th class="text-r col-hide" title="Ketgan mijozlardan yo'qotilgan MRR">Churn</th><th class="text-r col-hide" title="Kengaygan shartnomalardan qo'shimcha MRR">Exp</th><th class="text-r col-hide" title="Qisqargan shartnomalardan kamaygan MRR">Con</th><th class="text-r" title="Yangi + Exp − Churn − Con">Sof MRR</th></tr></thead><tbody>`;
   mb.forEach((m,i)=>{
     const nc=m.netMRR>=0?'var(--green)':'var(--red)';
     h+=`<tr><td style="font-weight:700;color:var(--text3)">${i+1}</td><td style="font-weight:600;font-size:12px"><span class="mgr-link" onclick="showMgrStats('${m.name.replace(/'/g,"\\'")}')">${m.name}</span></td><td class="text-r"><span class="up mono" style="font-size:11px">+${fmt(m.newMRR)}</span> <span style="font-size:9px;color:var(--text3)">(${m.newCount})</span></td><td class="text-r col-hide"><span class="dn mono" style="font-size:11px">-${fmt(m.churnMRR)}</span> <span style="font-size:9px;color:var(--text3)">(${m.churnCount})</span></td><td class="text-r col-hide mono" style="font-size:11px;color:var(--green)">${m.expMRR>0?'+'+fmt(m.expMRR):'—'}</td><td class="text-r col-hide mono" style="font-size:11px;color:${m.conMRR>0?'var(--amber)':'var(--text3)'}">${m.conMRR>0?'-'+fmt(m.conMRR):'—'}</td><td class="text-r mono" style="font-weight:700;color:${nc}">${m.netMRR>=0?'+':''}${fmt(m.netMRR)}</td></tr>`;

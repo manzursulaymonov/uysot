@@ -119,7 +119,9 @@ function dashRange(){
                     const cDate = new Date(meta.lastEver.endD.getFullYear(), meta.lastEver.endD.getMonth(), meta.lastEver.endD.getDate() + 1);
                     churnClients.push({name, date: cDate, mgr, mrr: Math.round(meta.mrrBase), izoh: '', hudud: meta.firstEver?.hudud||''});
                  }
-              } else { churnM -= delta; } 
+              }
+              // Non-departure bins: Churn client's pre-departure MRR changes
+              // are not attributed to the waterfall to avoid double-counting.
            }
            else if (meta.cat === 'Retained' || meta.cat === 'Resurrected') {
               // Intra-period movement check
@@ -257,7 +259,16 @@ function dashRange(){
     const cac = newClients.length > 0 ? (marketingSpend / newClients.length) : 0;
     const ltvCac = cac > 0 ? (ltv / cac) : 0;
 
-    return {labels, totals, cpmArr, newPerPt, churnPerPt, addedMRR: newMrrArr, lostMRR: churnMrrArr, expMRR: expMrrArr, conMRR: conMrrArr, newClients, churnClients, expClients, gran, points, baseMRR: Math.round(startMRRsum), baseClients: exactBaseClients, cashIn, cashInBreak, dso, top5Conc, top10Conc, ltv, quickRatio, logoChurnRate, revenueChurnRate, mrrGrowthPcts, netMovement, cac, ltvCac, clientMeta};
+    // === GRR (Gross Revenue Retention) ===
+    // GRR measures retention WITHOUT expansion — losses only.
+    // Formula: (startMRR - churnMRR - contractionMRR) / startMRR × 100, capped at 100%.
+    const grr = startMRRsum > 0
+      ? Math.min(100, Math.max(0, Math.round(
+          (startMRRsum - netMovement.churnMRR - netMovement.conMRR) / startMRRsum * 1000
+        ) / 10))
+      : 0;
+
+    return {labels, totals, cpmArr, newPerPt, churnPerPt, addedMRR: newMrrArr, lostMRR: churnMrrArr, expMRR: expMrrArr, conMRR: conMrrArr, newClients, churnClients, expClients, gran, points, baseMRR: Math.round(startMRRsum), baseClients: exactBaseClients, cashIn, cashInBreak, dso, top5Conc, top10Conc, ltv, quickRatio, logoChurnRate, revenueChurnRate, mrrGrowthPcts, netMovement, cac, ltvCac, clientMeta, grr};
   });
 }
 

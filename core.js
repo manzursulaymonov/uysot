@@ -23,6 +23,11 @@ function toggleTheme(){
 }
 initTheme();
 
+// === GLOBAL KEYBOARD HANDLER ===
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){const ov=document.querySelector('.overlay');if(ov)ov.remove()}
+});
+
 // === MOBILE SIDEBAR ===
 function toggleSidebar(){
   const sb=document.querySelector('.sidebar');
@@ -40,6 +45,7 @@ function closeSidebar(){
 function showToast(msg,type='info'){
   let c=document.querySelector('.toast-container');
   if(!c){c=document.createElement('div');c.className='toast-container';document.body.appendChild(c)}
+  while(c.children.length>=3)c.firstChild.remove();
   const t=document.createElement('div');t.className='toast toast-'+type;
   const icons={success:'✓',error:'✕',info:'ℹ'};
   t.innerHTML='<span style="font-size:14px;font-weight:700">'+icons[type]+'</span> '+msg;
