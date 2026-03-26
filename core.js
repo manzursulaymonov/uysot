@@ -288,3 +288,16 @@ function dashPreset(key){
   return presets[key]||presets['y'];
 }
 function applyPreset(key){S.dashPre=key;const p=dashPreset(key);S.dashFrom=p.from;S.dashTo=p.to;clearCache();render()}
+
+function downloadCSV(rows,filename){
+  if(!rows||!rows.length){showToast("Ma'lumot yo'q",'error');return}
+  const hs=Object.keys(rows[0]);
+  const esc=v=>{const s=v==null?'':String(v);return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s};
+  const csv=[hs.join(','),...rows.map(r=>hs.map(h=>esc(r[h])).join(','))].join('\r\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download=filename+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);showToast(filename+' yuklandi','success')
+}

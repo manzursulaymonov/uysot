@@ -352,7 +352,7 @@ if(S.cS)d=d.filter(r=>sc(r.status)===S.cS);if(S.cM)d=d.filter(r=>r.Manager===S.c
 const t=d.length,pg=Math.ceil(t/S.cN),sl=d.slice(S.cP*S.cN,(S.cP+1)*S.cN);
 const so=[{v:'',l:'Barcha'},{v:'A',l:'Aktiv'},{v:'D',l:'Bajarildi'},{v:'Q',l:'Eski qarz'},{v:'P',l:'Muammo'},{v:'O',l:'Ortiqcha'},{v:'X',l:'Bekor'}];
 const hasPay=S.payRows.length||S.y2024Rows.length||S.perevodRows.length;
-  let h = `<div class="page-header"><div><div class="page-title">Shartnomalar</div><div class="page-sub">${t} ta</div></div></div>`;
+  let h = `<div class="page-header"><div><div class="page-title">Shartnomalar</div><div class="page-sub">${t} ta</div></div><button class="btn-outline" onclick="exportContracts()" title="CSV yuklab olish">&#8595; CSV</button></div>`;
   
   const rn=calcRenewals();
   const ct5=rn.filter(r=>r.daysLeft<=5).length, ct10=rn.filter(r=>r.daysLeft>5&&r.daysLeft<=10).length, ct25=rn.filter(r=>r.daysLeft>10).length;
@@ -578,6 +578,7 @@ if(isM){
 return `<div class="page-header"><div><div class="page-title">Qarzdorlik</div><div class="page-sub">${repLabel} oy oxiriga · ${dt.length} ta mijoz</div></div>
 <div style="display:flex;gap:6px;align-items:center">
 <input type="date" class="flt" style="font-size:12px;padding:6px 10px" value="${repDate.toISOString().slice(0,10)}" onchange="S.debtDate=new Date(this.value);clearCache();render()">
+<button class="btn-outline" onclick="exportDebts()" title="CSV yuklab olish">&#8595; CSV</button>
 </div></div>
 
 <div class="metrics" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
@@ -620,4 +621,131 @@ return'<tr><td style="font-weight:500">'+r.name+'</td>'+
 ((!isM||S.debtMobCol==='oy')?`<td class="text-r mono" style="font-size:11px;color:${oyC};font-weight:${r.oyQarz>0?'600':'400'}">${r.oyQarz>0?fmt(r.oyQarz):'—'}</td>`:'')+
 ((!isM||S.debtMobCol==='kel')?`<td class="text-r mono" style="font-size:11px;color:${kelC};font-weight:${r.kelQarz>0?'700':'400'}">${r.kelQarz>0?fmt(r.kelQarz):'—'}</td>`:'')+
 ((!isM||S.debtMobCol==='lp')?lpCell:'')+'</tr>'}).join(''):`<tr><td colspan="${isM?2:5}" style="text-align:center;color:var(--text3);padding:20px">—</td></tr>`}</tbody></table></div></div>`;
+}
+
+// === MOLIYA / CFO PAGE ===
+function rMoliya(){
+  const mos=['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'];
+  const mosS=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+
+  // === MRR Forecast ===
+  const fc=calcMrrForecast();
+  const maxMRR=Math.max(...fc.map(m=>m.mrr),1);
+  let fRows='';
+  fc.forEach((m,i)=>{
+    const barW=Math.round(m.mrr/maxMRR*100);
+    const riskCol=m.expiringMRR>5000?'var(--red)':m.expiringMRR>2000?'var(--amber)':'var(--green)';
+    const isCur=i===0;
+    fRows+=`<tr${isCur?' style="background:var(--accent-bg)"':''}>
+      <td style="font-weight:${isCur?'700':'500'};white-space:nowrap">${m.label}${isCur?' <span class="badge b-accent" style="font-size:9px">Hozir</span>':''}</td>
+      <td class="text-r mono" style="font-weight:600">${fmt(m.mrr)}</td>
+      <td><div style="display:flex;align-items:center;gap:6px">
+        <div style="flex:1;background:var(--border);border-radius:4px;height:6px;min-width:60px">
+          <div style="width:${barW}%;background:var(--accent);height:6px;border-radius:4px"></div>
+        </div></div></td>
+      <td class="text-r" style="font-size:12px">${m.clients}</td>
+      <td class="text-r mono" style="color:${riskCol};font-size:12px">${m.expiringMRR?fmt(m.expiringMRR):'—'}</td>
+      <td style="font-size:11px;color:var(--text3)">${m.expiringCount?m.expiring.slice(0,3).map(e=>e.name).join(', ')+(m.expiring.length>3?'…':''):'—'}</td>
+    </tr>`;
+  });
+  const fcSection=`<div class="card" style="margin-bottom:16px">
+    <div class="card-head">
+      <span class="card-label">MRR Prognoz — Keyingi 6 oy</span>
+      <button class="btn-outline" style="font-size:11px" onclick="exportMrrForecast()">&#8595; CSV</button>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="tbl-scroll"><table><thead><tr>
+        <th>Oy</th><th class="text-r">MRR ($)</th><th>Trend</th><th class="text-r">Mijozlar</th>
+        <th class="text-r" title="Shu oyda tugaydigan shartnomalarning umumiy MRR">Xavf MRR</th>
+        <th>Tugaydiganlar</th>
+      </tr></thead><tbody>${fRows}</tbody></table></div>
+    </div>
+  </div>`;
+
+  // === AR Aging ===
+  const aging=calcARaging();
+  const agingTotal=aging.reduce((s,b)=>s+b.total,0);
+  let agingCards='';
+  aging.forEach(b=>{
+    const pct=agingTotal>0?Math.round(b.total/agingTotal*100):0;
+    agingCards+=`<div class="metric" style="border-top:3px solid ${b.color}">
+      <div class="metric-lbl">${b.label}</div>
+      <div class="metric-val mono" style="color:${b.color}">${fmt(b.total)}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">${b.clients.length} ta mijoz · ${pct}%</div>
+    </div>`;
+  });
+  let agingRows='';
+  const allAging=aging.flatMap(b=>b.clients.map(c=>({...c,bucket:b.label,color:b.color})));
+  allAging.sort((a,b)=>b.qarz-a.qarz).forEach(c=>{
+    agingRows+=`<tr>
+      <td style="font-weight:500">${c.name}</td>
+      <td><span class="badge" style="background:${c.color}20;color:${c.color};border:1px solid ${c.color}40">${c.bucket}</span></td>
+      <td class="text-r mono" style="color:var(--red);font-weight:600">${fmt(c.qarz)}</td>
+      <td class="text-r mono" style="font-size:11px;color:var(--text3)">${c.kelQarz>0?fmt(c.kelQarz):'—'}</td>
+      <td class="text-r" style="font-size:12px">${c.days<999?c.days+' kun':'—'}</td>
+      <td style="font-size:11px;color:var(--text3)">${c.lastPayDate}</td>
+    </tr>`;
+  });
+  const agingSection=`<div class="card" style="margin-bottom:16px">
+    <div class="card-head">
+      <span class="card-label">AR Aging — Qarz yoshi bo'yicha tahlil</span>
+      <button class="btn-outline" style="font-size:11px" onclick="exportARaging()">&#8595; CSV</button>
+    </div>
+    <div class="card-body">
+      <div class="metrics" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">${agingCards}</div>
+      ${agingRows?`<div class="tbl-scroll"><table><thead><tr>
+        <th>Mijoz</th><th>Muddat</th><th class="text-r">Oy qarzi</th><th class="text-r">Kelishuv</th><th class="text-r">Kechikish</th><th>Oxirgi to'lov</th>
+      </tr></thead><tbody>${agingRows}</tbody></table></div>`:'<div style="text-align:center;color:var(--text3);padding:24px">Qarzdor mijozlar yo\'q ✅</div>'}
+    </div>
+  </div>`;
+
+  // === Collection Rate ===
+  const cr=calcCollectionRate();
+  const now=new Date();
+  const curMon=mos[now.getMonth()]+' '+now.getFullYear();
+  let crRows='';
+  cr.slice(0,50).forEach(c=>{
+    const rateCol=c.rate>=90?'var(--green)':c.rate>=70?'var(--amber)':'var(--red)';
+    const barW=Math.min(100,c.rate);
+    const deltaCol=c.delta>=0?'var(--green)':'var(--red)';
+    crRows+=`<tr>
+      <td style="font-weight:500">${c.name}</td>
+      <td class="text-r mono" style="font-size:11px">${fmt(c.expected)}</td>
+      <td class="text-r mono" style="font-size:11px">${fmt(c.paid)}</td>
+      <td class="text-r mono" style="font-size:11px;color:${deltaCol};font-weight:600">${c.delta>=0?'+':''}${fmt(c.delta)}</td>
+      <td style="min-width:120px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;background:var(--border);border-radius:4px;height:8px">
+            <div style="width:${barW}%;background:${rateCol};height:8px;border-radius:4px"></div>
+          </div>
+          <span style="font-size:11px;font-weight:700;color:${rateCol};min-width:36px;text-align:right">${c.rate}%</span>
+        </div>
+      </td>
+    </tr>`;
+  });
+  const avgRate=cr.length?Math.round(cr.reduce((s,c)=>s+c.rate,0)/cr.length):0;
+  const avgRateCol=avgRate>=90?'var(--green)':avgRate>=70?'var(--amber)':'var(--red)';
+  const crSection=`<div class="card">
+    <div class="card-head">
+      <span class="card-label">Inkasso (To'lov undiruvi) — ${curMon}</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:13px;font-weight:700;color:${avgRateCol}">${avgRate}% o'rtacha</span>
+        <button class="btn-outline" style="font-size:11px" onclick="exportCollectionRate()">&#8595; CSV</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0">
+      ${cr.length?`<div class="tbl-scroll"><table><thead><tr>
+        <th>Mijoz</th><th class="text-r" title="Shartnoma bo'yicha kutilgan to'lovlar (yil boshidan)">Kutilgan</th>
+        <th class="text-r" title="Haqiqiy to'langan summa">To'langan</th>
+        <th class="text-r">Farq</th><th>Undiruv darajasi</th>
+      </tr></thead><tbody>${crRows}</tbody></table></div>
+      <div style="padding:12px 16px;font-size:11px;color:var(--text3);border-top:1px solid var(--border)">
+        Jami ${cr.length} ta mijoz · ${cr.filter(c=>c.rate>=90).length} ta ≥90% · ${cr.filter(c=>c.rate<70).length} ta &lt;70%
+      </div>`
+      :'<div style="text-align:center;color:var(--text3);padding:24px">Ma\'lumot yo\'q</div>'}
+    </div>
+  </div>`;
+
+  return `<div class="page-header"><div><div class="page-title">Moliya / CFO</div><div class="page-sub">MRR prognoz · AR Aging · Inkasso tahlili</div></div></div>
+  ${fcSection}${agingSection}${crSection}`;
 }

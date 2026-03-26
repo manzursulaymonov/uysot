@@ -609,6 +609,76 @@ function calcCumExpected(year){
   });
 }
 
+// === AR AGING ===
+function calcARaging(){
+  return cached('arAging_v1',()=>{
+    const now=new Date();
+    const dt=calcDebtTable(now);
+    const lp=calcLastPayments();
+    const buckets=[
+      {label:'0–30 kun',min:0,max:30,color:'var(--amber)',tag:'b-amber',clients:[],total:0},
+      {label:'31–60 kun',min:31,max:60,color:'var(--red)',tag:'b-red',clients:[],total:0},
+      {label:'61–90 kun',min:61,max:90,color:'var(--red)',tag:'b-red',clients:[],total:0},
+      {label:'90+ kun',min:91,max:9999,color:'var(--purple)',tag:'b-purple',clients:[],total:0}
+    ];
+    dt.forEach(d=>{
+      if(d.oyQarz<=0)return;
+      const lastP=lp[d.name];
+      const days=lastP?Math.round((now-lastP.date)/864e5):999;
+      const b=days<=30?buckets[0]:days<=60?buckets[1]:days<=90?buckets[2]:buckets[3];
+      b.clients.push({name:d.name,qarz:d.oyQarz,kelQarz:d.kelQarz,days,lastPayDate:lastP?lastP.dateStr:'Hech qachon'});
+      b.total+=d.oyQarz;
+    });
+    return buckets;
+  });
+}
+
+// === MRR FORECAST (6 oy) ===
+function calcMrrForecast(){
+  return cached('mrrForecast_v1',()=>{
+    const now=new Date();
+    const {all,qAll}=buildContracts();
+    const mos=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+    const months=[];
+    for(let i=0;i<=5;i++){
+      const absM=now.getMonth()+i;
+      const y=now.getFullYear()+Math.floor(absM/12);
+      const m=absM%12;
+      const mEnd=new Date(y,m+1,0,23,59,59);
+      const snap=mrrOnDate(mEnd,all,qAll);
+      const expiring=all.concat(qAll).filter(c=>c.musd>0&&c.endD.getFullYear()===y&&c.endD.getMonth()===m);
+      const expiringMRR=Math.round(expiring.reduce((s,c)=>s+c.musd,0));
+      months.push({
+        label:mos[m]+' \''+(y%100),
+        mrr:Math.round(snap.total),
+        clients:snap.active.size,
+        expiringMRR,
+        expiringCount:expiring.length,
+        expiring:expiring.map(c=>({name:c.client,mrr:c.musd,mgr:c.mgr}))
+      });
+    }
+    return months;
+  });
+}
+
+// === INKASSO / COLLECTION RATE ===
+function calcCollectionRate(){
+  return cached('collRate_v1',()=>{
+    const now=new Date();
+    const cumExp=calcCumExpected(now.getFullYear());
+    const pm=calcPayments();
+    const clientPaid={};
+    Object.values(pm).forEach(v=>{clientPaid[v.client]=(clientPaid[v.client]||0)+v.total});
+    return Object.entries(cumExp).map(([name,data])=>{
+      const expected=Math.round(data.cum[now.getMonth()]||0);
+      if(expected<100)return null;
+      const paid=Math.round(clientPaid[name]||0);
+      const rate=expected>0?Math.round(paid/expected*100):0;
+      return{name,expected,paid,rate,delta:paid-expected};
+    }).filter(Boolean).sort((a,b)=>a.rate-b.rate);
+  });
+}
+
 // === RENDER ===
 let _rdT;function render(){clearTimeout(_rdT);_rdT=setTimeout(_render,0)}
 let _lastSec=null;
@@ -616,7 +686,7 @@ function _render(){
   if(!S.rows.length){showWelcome();return}
   const ae=document.activeElement;const isInput=ae&&ae.tagName==='INPUT'&&ae.type==='text';
   const sel=isInput?{s:ae.selectionStart,e:ae.selectionEnd,sec:S.sec,ph:ae.placeholder}:null;
-  const f={dashboard:rD,contracts:rC,mrrtable:rMRR,managers:rM,clients:rCl,topmrr:rT,debts:rDebt};
+  const f={dashboard:rD,contracts:rC,mrrtable:rMRR,managers:rM,clients:rCl,topmrr:rT,debts:rDebt,moliya:rMoliya};
   // Save scroll positions before re-render
   const tbl=document.querySelector('.tbl-scroll');
   const savedTop=tbl?tbl.scrollTop:0;

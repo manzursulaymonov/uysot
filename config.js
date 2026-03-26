@@ -448,6 +448,79 @@ async function generateReport(){
   showToast('Hisobot yuklandi!','success');
 }
 
+// === EXPORTS ===
+window.exportContracts=function(){
+  if(!S.rows.length){showToast("Ma'lumot yo'q",'error');return}
+  const pm=calcPayments();
+  const rows=S.rows.map(r=>{
+    const p=pm[r.raqami]||{};
+    return{
+      'Raqami':r.raqami||'',
+      'Mijoz':r.Client||'',
+      'Firma':r['Firma nomi']||'',
+      'Hudud':r.Hudud||'',
+      'Menejer':r.Manager||'',
+      'Boshlanish':r.sanasi||'',
+      'Tugash':r['amal qilishi']||'',
+      'Oylik USD':Math.round(r._mUSD||0),
+      'Jami USD':Math.round(r._sUSD||0),
+      "To'langan":Math.round(p.total||0),
+      'Qarz':Math.round((r._sUSD||0)-(p.total||0)),
+      'Status':r.status||''
+    }
+  });
+  downloadCSV(rows,'Shartnomalar')
+};
+
+window.exportDebts=function(){
+  const now=S.debtDate||new Date();
+  const dt=calcDebtTable(now);
+  const rows=dt.map(r=>({
+    'Mijoz':r.name,
+    'Shartnoma qoldig\'i':Math.round(r.qoldiq||0),
+    'Oy oxiri qarzi':Math.round(r.oyQarz||0),
+    'Kelishuv qarzi':Math.round(r.kelQarz||0)
+  }));
+  downloadCSV(rows,'Qarzdorlik')
+};
+
+window.exportARaging=function(){
+  const aging=calcARaging();
+  const rows=aging.flatMap(b=>b.clients.map(c=>({
+    'Mijoz':c.name,
+    'Muddat':b.label,
+    'Oy qarzi':Math.round(c.qarz),
+    'Kelishuv qarzi':Math.round(c.kelQarz||0),
+    'Kechikish (kun)':c.days<999?c.days:'',
+    "Oxirgi to'lov":c.lastPayDate
+  })));
+  downloadCSV(rows,'AR_Aging')
+};
+
+window.exportCollectionRate=function(){
+  const cr=calcCollectionRate();
+  const rows=cr.map(c=>({
+    'Mijoz':c.name,
+    'Kutilgan':c.expected,
+    "To'langan":c.paid,
+    'Farq':c.delta,
+    'Undiruv %':c.rate
+  }));
+  downloadCSV(rows,'Inkasso')
+};
+
+window.exportMrrForecast=function(){
+  const fc=calcMrrForecast();
+  const rows=fc.map(m=>({
+    'Oy':m.label,
+    'MRR ($)':m.mrr,
+    'Mijozlar':m.clients,
+    'Xavf MRR':m.expiringMRR,
+    'Tugaydiganlar soni':m.expiringCount
+  }));
+  downloadCSV(rows,'MRR_Prognoz')
+};
+
 // === DEBUG ===
 function debugMRRcompare(){const dt=S.dashTo||new Date();const yr=dt.getFullYear(),m=dt.getMonth();const {all,qAll}=buildContracts();const snap=mrrOnDate(dt,all,qAll);const byClient1={};all.forEach(ct=>{if(ct.st<=dt&&ct.endD>=dt&&ct.musd>0)byClient1[ct.client]=(byClient1[ct.client]||0)+ct.musd});qAll.forEach(ct=>{if(ct.st<=dt&&ct.endD>=dt&&ct.musd)byClient1[ct.client]=(byClient1[ct.client]||0)+ct.musd});const d=mrrData(yr);const byClient2={};d.clients.forEach(c=>{if(c.monthly[m])byClient2[c.name]=c.monthly[m]});const allN=new Set([...Object.keys(byClient1),...Object.keys(byClient2)]);const diffs=[];allN.forEach(n=>{const v1=Math.round(byClient1[n]||0),v2=Math.round(byClient2[n]||0);if(v1!==v2)diffs.push({name:n,dashboard:v1,jadval:v2,farq:v2-v1})});diffs.sort((a,b)=>Math.abs(b.farq)-Math.abs(a.farq));console.table(diffs);return diffs}
 window.debugMRR=debugMRRcompare;
