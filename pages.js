@@ -382,7 +382,8 @@ return`<tr><td class="mono" style="font-size:10px;color:var(--text3)">${r.raqami
 
 // === MRR TABLE ===
 function rMRR(){
-const yr=S.mrrYear||2026;const d=mrrData(yr);const cumExp=calcCumExpected(yr);const clPay=calcClientPayments();
+const yr=S.mrrYear||2026;const d=mrrData(yr);const cumExp=calcCumExpected(yr);
+const _pm=calcPayments();const clPay={};Object.values(_pm).forEach(v=>{clPay[v.client]=(clPay[v.client]||0)+v.total});
 const mos=['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
 const cc=S.mrrCols;let filtered=[...d.clients];
 if(S.mrrQ){const q=S.mrrQ.toLowerCase();filtered=filtered.filter(c=>c.name.toLowerCase().includes(q)||c.mgr.toLowerCase().includes(q)||(c.hudud||'').toLowerCase().includes(q))}
