@@ -222,6 +222,7 @@ body{
 .metric.c3::after{background:linear-gradient(90deg,var(--amber),#f0b020)}
 .metric.c4::after{background:linear-gradient(90deg,var(--red),#f06050)}
 .metric.c5::after{background:linear-gradient(90deg,var(--purple),#a07ce8)}
+.metric.c6::after{background:linear-gradient(90deg,#059669,#34d399)}
 .metric-lbl{font-size:11px;color:var(--text3);font-weight:500}
 .metric-val{font-size:24px;font-weight:700;letter-spacing:-1px;margin:4px 0 1px;font-family:var(--mono)}
 .metric-foot{font-size:11px;color:var(--text2)}
@@ -640,3 +641,7 @@ input:focus-visible{outline:none}
 
 /* === SELECTION === */
 ::selection{background:var(--accent-bg);color:var(--accent)}
+
+/* === INTERACTION === */
+.mgr-link { cursor: pointer; color: var(--accent); transition: color .2s; }
+.mgr-link:hover { color: var(--accent2); text-decoration: underline; }

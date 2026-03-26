@@ -102,9 +102,9 @@ if(eComp){
   });
 }
 
-const e4=document.getElementById('chMM');if(e4){if(Chart.getChart(e4)) Chart.getChart(e4)?.destroy();const m={};S.rows.forEach(r=>{const n=r.Manager||'?';m[n]=(m[n]||0)+r._mUSD});const e=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10);new Chart(e4,{type:'bar',data:{labels:e.map(x=>x[0]),datasets:[{data:e.map(x=>x[1]),backgroundColor:co,borderRadius:4}]},options:{...bo,indexAxis:'y',scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>fk(v)}},y:{grid:{display:false},ticks:{color:tc,font:{size:11}}}}}})}
+const e4=document.getElementById('chMM');if(e4){if(Chart.getChart(e4)) Chart.getChart(e4)?.destroy();const mg=calcManagerAcquisition().slice(0,10);new Chart(e4,{type:'bar',data:{labels:mg.map(x=>x.name),datasets:[{data:mg.map(x=>x.initialMRR),backgroundColor:co,borderRadius:4}]},options:{...bo,indexAxis:'y',scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>fk(v)}},y:{grid:{display:false},ticks:{color:tc,font:{size:11}}}}}})}
 
-const e5=document.getElementById('chMC');if(e5){if(Chart.getChart(e5)) Chart.getChart(e5)?.destroy();const m={};S.rows.forEach(r=>{const n=r.Manager||'?';m[n]=(m[n]||0)+1});const e=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10);new Chart(e5,{type:'bar',data:{labels:e.map(x=>x[0]),datasets:[{data:e.map(x=>x[1]),backgroundColor:co.map(c=>c+'cc'),borderRadius:4}]},options:{...bo,indexAxis:'y',scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{display:false},ticks:{color:tc,font:{size:11}}}}}})}
+const e5=document.getElementById('chMC');if(e5){if(Chart.getChart(e5)) Chart.getChart(e5)?.destroy();const mg=calcManagerAcquisition().sort((a,b)=>b.clients-a.clients).slice(0,10);new Chart(e5,{type:'bar',data:{labels:mg.map(x=>x.name),datasets:[{data:mg.map(x=>x.clients),backgroundColor:co.map(c=>c+'cc'),borderRadius:4}]},options:{...bo,indexAxis:'y',scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{display:false},ticks:{color:tc,font:{size:11}}}}}})}
 
 const e6=document.getElementById('chT');if(e6){if(Chart.getChart(e6)) Chart.getChart(e6)?.destroy();const a=activeR().sort((a,b)=>b._mUSD-a._mUSD).slice(0,10);new Chart(e6,{type:'bar',data:{labels:a.map(r=>r.Client||'?'),datasets:[{data:a.map(r=>r._mUSD),backgroundColor:'#1746a2',borderRadius:4}]},options:{...bo,indexAxis:'y',scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>fk(v)}},y:{grid:{display:false},ticks:{color:tc,font:{size:11}}}}}})}
 
@@ -131,7 +131,8 @@ const sheets=[
   {k:'qoshimcha',l:'Qo\'shimcha',d:'Qo\'shimcha kelishuvlar',n:S.qRows.length,ft:'extra'},
   {k:'payments',l:'Payments',d:'2025+ to\'lovlar reestri',n:S.payRows.length,ft:'pay'},
   {k:'2024',l:'2024',d:'2025 gacha jami to\'lovlar',n:S.y2024Rows.length,ft:'y24'},
-  {k:'perevod',l:'Perevod',d:'O\'zaro hisob-kitob, kurs farqi',n:S.perevodRows.length,ft:'per'}
+  {k:'perevod',l:'Perevod',d:'O\'zaro hisob-kitob, kurs farqi',n:S.perevodRows.length,ft:'per'},
+  {k:'mkt',l:'Marketing',d:'Marketing xarajatlari (Yil, Oy, Summa)',n:S.mktRows.length,ft:'mkt'}
 ];
 const o=document.createElement('div');o.className='overlay';o.onclick=e=>{if(e.target===o)o.remove()};
 o.innerHTML=`<div class="modal" style="max-width:520px">
@@ -203,49 +204,157 @@ ${sections.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding
 <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border-radius:6px;cursor:pointer;font-size:12px"><input type="radio" name="ai" value="claude" ${ai==='claude'?'checked':''} onchange="S.aiProvider='claude';localStorage.setItem('uysot_ai','claude')" style="accent-color:var(--accent)">Claude AI (Anthropic)</label>
 <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border-radius:6px;cursor:pointer;font-size:12px"><input type="radio" name="ai" value="gemini" ${ai==='gemini'?'checked':''} onchange="S.aiProvider='gemini';localStorage.setItem('uysot_ai','gemini')" style="accent-color:var(--accent)">Gemini AI (Google)</label>
 </div>
-<div class="modal-btns" style="gap:8px">
-<button class="btn" onclick="this.closest('.overlay').remove()">Bekor</button>
-<button class="btn btn-primary" style="padding:9px 24px" onclick="this.closest('.overlay').remove();generateReport()">Shaklantirish</button>
 </div></div>`;document.body.appendChild(o)}
 function showDashSettingsModal(){
   const o=document.createElement('div');o.className='overlay';o.onclick=e=>{if(e.target===o)o.remove()};
   const c=S.dashCards||{};
-  const up=(g,k,v,el)=>{if(!S.dashCards[g])S.dashCards[g]={};S.dashCards[g][k]=v;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));if(window.render)render();if(el){el.style.opacity=v?1:0.5;el.style.pointerEvents=v?'auto':'none'}};
-  o.innerHTML=`<div class="modal" style="max-width:400px">
-  <h2 style="display:flex;align-items:center;gap:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Dashboard Kartalar sozlamasi</h2>
-  <div class="sub" style="margin-bottom:16px">Qaysi ko'rsatgichlar asosiy ekranda chiqishini belgilang</div>
-  <div class="mrr-set" style="display:flex;flex-direction:column;gap:12px;max-height:65vh;overflow-y:auto;padding-right:4px">
-    <div style="background:var(--bg3);padding:10px;border-radius:8px">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:pointer"><input type="checkbox" ${c.mrr?.s?'checked':''} onchange="const d=this.closest('div').querySelector('.s-opts');if(!S.dashCards.mrr)S.dashCards.mrr={};S.dashCards.mrr.s=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render();d.style.opacity=this.checked?1:0.5;d.style.pointerEvents=this.checked?'auto':'none'">1. MRR</label>
-      <div class="s-opts" style="margin-left:24px;margin-top:6px;display:flex;flex-direction:column;gap:6px;opacity:${c.mrr?.s?1:0.5};pointer-events:${c.mrr?.s?'auto':'none'}">
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.mrr?.g?'checked':''} onchange="S.dashCards.mrr.g=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">O'sish foizi (Growth)</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.mrr?.arr?'checked':''} onchange="S.dashCards.mrr.arr=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">ARR (Yillik daromad)</label>
-      </div></div>
-    <div style="background:var(--bg3);padding:10px;border-radius:8px">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:pointer"><input type="checkbox" ${c.nrr?.s?'checked':''} onchange="const d=this.closest('div').querySelector('.s-opts');if(!S.dashCards.nrr)S.dashCards.nrr={};S.dashCards.nrr.s=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render();d.style.opacity=this.checked?1:0.5;d.style.pointerEvents=this.checked?'auto':'none'">2. NRR</label>
-      <div class="s-opts" style="margin-left:24px;margin-top:6px;display:flex;flex-direction:column;gap:6px;opacity:${c.nrr?.s?1:0.5};pointer-events:${c.nrr?.s?'auto':'none'}">
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.nrr?.n?'checked':''} onchange="S.dashCards.nrr.n=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">New (Yangi/Qayta)</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.nrr?.e?'checked':''} onchange="S.dashCards.nrr.e=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">Net Exp (Kengayish qoldig'i)</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.nrr?.c?'checked':''} onchange="S.dashCards.nrr.c=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">Churn (Sop-pa soqqa chiqim)</label>
-      </div></div>
-    <div style="background:var(--bg3);padding:10px;border-radius:8px">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:pointer"><input type="checkbox" ${c.cust?.s?'checked':''} onchange="const d=this.closest('div').querySelector('.s-opts');if(!S.dashCards.cust)S.dashCards.cust={};S.dashCards.cust.s=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render();d.style.opacity=this.checked?1:0.5;d.style.pointerEvents=this.checked?'auto':'none'">3. Active Customers</label>
-      <div class="s-opts" style="margin-left:24px;margin-top:6px;display:flex;flex-direction:column;gap:6px;opacity:${c.cust?.s?1:0.5};pointer-events:${c.cust?.s?'auto':'none'}">
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.cust?.g?'checked':''} onchange="S.dashCards.cust.g=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">Sof o'sish dinamikasi</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.cust?.ch?'checked':''} onchange="S.dashCards.cust.ch=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">Churn Rate (Ketish xavfi)</label>
-      </div></div>
-    <div style="background:var(--bg3);padding:10px;border-radius:8px">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:pointer"><input type="checkbox" ${c.arpa?.s?'checked':''} onchange="const d=this.closest('div').querySelector('.s-opts');if(!S.dashCards.arpa)S.dashCards.arpa={};S.dashCards.arpa.s=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render();d.style.opacity=this.checked?1:0.5;d.style.pointerEvents=this.checked?'auto':'none'">4. ARPA</label>
-      <div class="s-opts" style="margin-left:24px;margin-top:6px;display:flex;flex-direction:column;gap:6px;opacity:${c.arpa?.s?1:0.5};pointer-events:${c.arpa?.s?'auto':'none'}">
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" ${c.arpa?.g?'checked':''} onchange="S.dashCards.arpa.g=this.checked;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));render()">O'sish dinamikasi</label>
-      </div></div>
-    <div style="background:var(--bg3);padding:10px;border-radius:8px;opacity:0.6">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px;cursor:not-allowed;color:var(--text3)"><input type="checkbox" disabled ${c.cac?.s?'checked':''}>5. CAC</label>
-      <div style="margin-left:24px;margin-top:4px;font-size:10px;color:var(--text3)">Hozircha xarajatlar bazasi ulanmaganligi sababli ushbu karta yopiq.</div>
+  if(!c.mrr) c.mrr={s:1,arr:1,g:1};
+  if(!c.nrr) c.nrr={s:1,n:1,c:1,e:1};
+  if(!c.cust) c.cust={s:1,g:1,ch:1};
+  if(!c.arpa) c.arpa={s:1,g:1};
+  if(!c.cac) c.cac={s:0,d:1};
+  if(!c.cash) c.cash={s:1};
+  if(!c.dso) c.dso={s:1};
+  if(!c.conc) c.conc={s:1};
+  if(!c.ltv) c.ltv={s:1};
+  if(!c.qr) c.qr={s:1};
+  if(!c.lc) c.lc={s:1};
+  if(!c.cMrrGr) c.cMrrGr={s:1};
+  if(!c.cNetMov) c.cNetMov={s:1};
+  if(!c.tRenew) c.tRenew={s:1};
+  if(!c.tRegion) c.tRegion={s:1};
+  if(!c.tMgr) c.tMgr={s:1};
+  if(!c.tHealth) c.tHealth={s:1};
+  const up=(g,k,v)=>{if(!S.dashCards[g])S.dashCards[g]={};S.dashCards[g][k]=v;localStorage.setItem('uysot_cards',JSON.stringify(S.dashCards));if(window.render)render()};
+  
+  o.innerHTML=`<div class="modal" style="max-width:560px; padding:0; overflow:hidden; border:none; background:var(--bg1); box-shadow:0 20px 50px rgba(0,0,0,0.3)">
+    <div style="padding:20px; background:var(--bg2); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between">
+      <h3 style="margin:0; display:flex; align-items:center; gap:10px; font-size:17px; color:var(--text)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Dashboard Sozlamalari
+      </h3>
+      <button class="btn-close" onclick="this.closest('.overlay').remove()" style="background:none; border:none; color:var(--text3); cursor:pointer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
     </div>
-  </div>
-  <div style="margin-top:16px"><button class="btn btn-primary w-100" style="padding:10px" onclick="this.closest('.overlay').remove()">Saqlash va Yopish</button></div>
-  </div>`;document.body.appendChild(o);
+    
+    <div style="padding:24px; max-height:75vh; overflow-y:auto; background:var(--bg1)">
+      <!-- KPI SECTION -->
+      <div style="margin-bottom:30px">
+        <div style="font-size:12px; text-transform:uppercase; color:var(--text); letter-spacing:1px; margin-bottom:15px; font-weight:800; display:flex; align-items:center; gap:10px">
+          <span style="background:var(--accent); width:4px; height:14px; border-radius:2px"></span>
+          1. KPI KARTALARI (TOP)
+        </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:12px">
+          
+          <!-- MRR CARD -->
+          <div style="background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden">
+            <div style="padding:12px 15px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px">
+              <input type="checkbox" ${c.mrr?.s?'checked':''} onchange="(${up.toString()})('mrr','s',this.checked)" style="width:16px; height:16px">
+              <span style="font-weight:700; font-size:14px">MRR (Monthly Recurring Revenue)</span>
+            </div>
+            <div style="padding:12px 15px; display:flex; gap:20px; font-size:12px; opacity:${c.mrr?.s?1:0.5}; pointer-events:${c.mrr?.s?'auto':'none'}">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" ${c.mrr?.g?'checked':''} onchange="(${up.toString()})('mrr','g',this.checked)"> O'sish (Growth %)</label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" ${c.mrr?.arr?'checked':''} onchange="(${up.toString()})('mrr','arr',this.checked)"> ARR (Yillik)</label>
+            </div>
+          </div>
+
+          <!-- NRR CARD -->
+          <div style="background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden">
+            <div style="padding:12px 15px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px">
+              <input type="checkbox" ${c.nrr?.s?'checked':''} onchange="(${up.toString()})('nrr','s',this.checked)" style="width:16px; height:16px">
+              <span style="font-weight:700; font-size:14px">NRR (Net Revenue Retention)</span>
+            </div>
+            <div style="padding:12px 15px; display:flex; flex-wrap:wrap; gap:15px; font-size:12px; opacity:${c.nrr?.s?1:0.5}; pointer-events:${c.nrr?.s?'auto':'none'}">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" ${c.nrr?.n?'checked':''} onchange="(${up.toString()})('nrr','n',this.checked)"> New/Reactivated</label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" ${c.nrr?.e?'checked':''} onchange="(${up.toString()})('nrr','e',this.checked)"> Net Expansion</label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" ${c.nrr?.c?'checked':''} onchange="(${up.toString()})('nrr','c',this.checked)"> Churn (Yo'qotish)</label>
+            </div>
+          </div>
+
+          <!-- Active Customers CARD -->
+          <div style="background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden">
+            <div style="padding:12px 15px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px">
+              <input type="checkbox" ${c.cust?.s?'checked':''} onchange="(${up.toString()})('cust','s',this.checked)" style="width:16px; height:16px">
+              <span style="font-weight:700; font-size:14px">Active Customers</span>
+            </div>
+            <div style="padding:12px 15px; display:flex; gap:20px; font-size:12px; opacity:${c.cust?.s?1:0.5}; pointer-events:${c.cust?.s?'auto':'none'}">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" ${c.cust?.g?'checked':''} onchange="(${up.toString()})('cust','g',this.checked)"> Sof o'sish</label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" ${c.cust?.ch?'checked':''} onchange="(${up.toString()})('cust','ch',this.checked)"> Churn Rate (%)</label>
+            </div>
+          </div>
+
+          <!-- ARPA CARD -->
+          <div style="background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden">
+            <div style="padding:12px 15px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px">
+              <input type="checkbox" ${c.arpa?.s?'checked':''} onchange="(${up.toString()})('arpa','s',this.checked)" style="width:16px; height:16px">
+              <span style="font-weight:700; font-size:14px">ARPA (Average Revenue Per Account)</span>
+            </div>
+            <div style="padding:12px 15px; display:flex; gap:20px; font-size:12px; opacity:${c.arpa?.s?1:0.5}; pointer-events:${c.arpa?.s?'auto':'none'}">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer"><input type="checkbox" ${c.arpa?.g?'checked':''} onchange="(${up.toString()})('arpa','g',this.checked)"> O'sish dinamikasi</label>
+            </div>
+          </div>
+
+        </div>
+        <div class="dash-set-grp">
+          <div class="dash-set-lbl">💰 Financial Metrics</div>
+          ${renderSetCard('cash', 'Net Cash In (Phases 21+)', c.cash?.s !== false, up)}
+          ${renderSetCard('cac', 'CAC (Customer Acquisition Cost)', c.cac?.s !== false, up)}
+        </div>
+        <div class="dash-set-grp">
+          <div class="dash-set-lbl">📊 Business Efficiency</div>
+          ${renderSetCard('dso', 'DSO (Days Sales Outstanding)', c.dso?.s !== false, up)}
+          ${renderSetCard('conc', 'Revenue Concentration', c.conc?.s !== false, up)}
+          ${renderSetCard('ltv', 'LTV (Lifetime Value)', c.ltv?.s !== false, up)}
+          ${renderSetCard('qr', 'SaaS Quick Ratio', c.qr?.s !== false, up)}
+          ${renderSetCard('lc', 'Logo vs Revenue Churn', c.lc?.s !== false, up)}
+        </div>
+      </div>
+
+      <!-- CHARTS SECTION -->
+      <div style="margin-bottom:30px">
+        <div style="font-size:12px; text-transform:uppercase; color:var(--text); letter-spacing:1px; margin-bottom:15px; font-weight:800; display:flex; align-items:center; gap:10px">
+          <span style="background:var(--amber); width:4px; height:14px; border-radius:2px"></span>
+          2. GRAFIK VA DIAGRAMMALAR
+        </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:10px">
+          ${renderSetCard('chTrend', 'Total MRR Trend (Line Chart)', c.chTrend?.s !== false, up)}
+          ${renderSetCard('chComp', 'MRR Components (Bar Chart)', c.chComp?.s !== false, up)}
+          ${renderSetCard('cMrrGr', 'MRR Growth Rate (Sparkline)', c.cMrrGr?.s !== false, up)}
+          ${renderSetCard('cNetMov', 'Net MRR Movement', c.cNetMov?.s !== false, up)}
+        </div>
+      </div>
+
+      <!-- TABLES SECTION -->
+      <div>
+        <div style="font-size:12px; text-transform:uppercase; color:var(--text); letter-spacing:1px; margin-bottom:15px; font-weight:800; display:flex; align-items:center; gap:10px">
+          <span style="background:var(--green); width:4px; height:14px; border-radius:2px"></span>
+          3. BATAFSIL JADVALLAR
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+          ${renderSetCard('tNew', 'Yangi mijozlar', c.tNew?.s !== false, up)}
+          ${renderSetCard('tChurn', 'Yo\'qotilganlar', c.tChurn?.s !== false, up)}
+          ${renderSetCard('tExp', 'Kengayishlar', c.tExp?.s !== false, up)}
+          ${renderSetCard('tCohort', 'Cohort Analysis', c.tCohort?.s !== false, up)}
+          ${renderSetCard('tRenew', 'Shartnoma Kalendari', c.tRenew?.s !== false, up)}
+          ${renderSetCard('tRegion', 'Hudud bo\'yicha', c.tRegion?.s !== false, up)}
+          ${renderSetCard('tMgr', 'Menejer Reytingi', c.tMgr?.s !== false, up)}
+          ${renderSetCard('tHealth', 'Mijoz Sog\'ligi', c.tHealth?.s !== false, up)}
+        </div>
+      </div>
+
+    </div>
+
+    <div style="padding:15px 24px; background:var(--bg2); border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px">
+      <button class="btn btn-primary" style="padding:10px 30px; font-weight:600" onclick="this.closest('.overlay').remove()">Tayyor</button>
+    </div>
+  </div>`;
+  document.body.appendChild(o);
+}
+
+function renderSetCard(key, label, val, upFn) {
+  return `<label style="background:var(--bg2); padding:15px; border-radius:12px; border:1px solid var(--border); font-size:14px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:all 0.2s" class="set-item">
+    <input type="checkbox" ${val?'checked':''} onchange="(${upFn.toString()})('${key}','s',this.checked)" style="width:16px; height:16px">
+    <span style="font-weight:600">${label}</span>
+  </label>`;
 }
 // === DATA LOADING ===
 async function fetchCsv(url,label){
@@ -279,8 +388,8 @@ async function loadFromConfig(config){
   }
 }
 
-function saveCache(){try{const cache={rows:S.rows,qRows:S.qRows,payRows:S.payRows,y2024Rows:S.y2024Rows,perevodRows:S.perevodRows,ts:Date.now()};localStorage.setItem('uysot_data',JSON.stringify(cache))}catch(e){console.warn('[Cache]',e.message)}}
-function loadCache(){try{const raw=localStorage.getItem('uysot_data');if(!raw)return false;const cache=JSON.parse(raw);if(!cache.rows||!cache.rows.length)return false;S.rows=cache.rows;S.qRows=cache.qRows||[];S.payRows=cache.payRows||[];S.y2024Rows=cache.y2024Rows||[];S.perevodRows=cache.perevodRows||[];return true}catch(e){return false}}
+function saveCache(){try{const cache={rows:S.rows,qRows:S.qRows,payRows:S.payRows,y2024Rows:S.y2024Rows,perevodRows:S.perevodRows,mktRows:S.mktRows,ts:Date.now()};localStorage.setItem('uysot_data',JSON.stringify(cache))}catch(e){console.warn('[Cache]',e.message)}}
+function loadCache(){try{const raw=localStorage.getItem('uysot_data');if(!raw)return false;const cache=JSON.parse(raw);if(!cache.rows||!cache.rows.length)return false;S.rows=cache.rows;S.qRows=cache.qRows||[];S.payRows=cache.payRows||[];S.y2024Rows=cache.y2024Rows||[];S.perevodRows=cache.perevodRows||[];S.mktRows=cache.mktRows||[];return true}catch(e){return false}}
 
 function loadJsonConfig(input){const f=input.files[0];if(!f)return;
 const r=new FileReader();r.onload=e=>{try{const config=JSON.parse(e.target.result);if(!config.shartnomalar)throw new Error('"shartnomalar" havolasi topilmadi');localStorage.setItem('uysot_config',e.target.result);S.config=config;loadFromConfig(config)}catch(e){alert('JSON xatolik: '+e.message)}};r.readAsText(f)}
@@ -297,9 +406,10 @@ function errPage(title,detail){return`<div class="loading" style="gap:12px">
 
 function loadFile(i,type){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{
 const t=e.target.result;
-const map={main:['rows','parse'],extra:['qRows','parse'],pay:['payRows','parseRaw'],y24:['y2024Rows','parseRaw'],per:['perevodRows','parseRaw']};
-const [key,fn]=map[type]||['rows','parse'];
-S[key]=(fn==='parse'?parse:parseRaw)(t);
+const map={main:['rows','parse'],extra:['qRows','parse'],pay:['payRows','parseRaw'],y24:['y2024Rows','parseRaw'],per:['perevodRows','parseRaw'],mkt:['mktRows','parseMkt']};
+const [key,fnStr]=map[type]||['rows','parse'];
+const fn = fnStr==='parse'?parse:(fnStr==='parseRaw'?parseRaw:parseMkt);
+S[key]=fn(t);
 saveCache();clearCache();
 document.querySelector('.overlay')?.remove();
 document.getElementById('upd').textContent=new Date().toLocaleTimeString('uz');

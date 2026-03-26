@@ -4,7 +4,7 @@
 
 // === DASHBOARD RANGE ===
 function dashRange(){
-  const cacheKey='dr_'+S.dashPre+'_'+S.dashFrom?.getTime()+'_'+S.dashTo?.getTime();
+  const cacheKey='dr_'+S.dashPre+'_'+S.dashFrom?.getTime()+'_'+S.dashTo?.getTime()+'_v3';
   return cached(cacheKey,()=>{
     const from=S.dashFrom,to=S.dashTo;const days=Math.round((to-from)/864e5);
     let gran=days<=31?'day':'month';const points=[];
@@ -31,14 +31,14 @@ function dashRange(){
         const cts = allData.filter(c=>c.client===name);
         const firstEver = cts.reduce((a,c)=>c.st < a.st ? c : a);
         const lastEver = cts.reduce((a,c)=>c.endD > a.endD ? c : a);
+        const firstMgrs = firstEver.mgr || 'Tayinlanmagan';
         
         const mBase = getMRR(name, baseDate);
-        // Baseline: 01.01.2026 da bor bo'lgan va oldindan kelayotgan mijozlar
         const inBase = mBase > 0 && firstEver.st < from;
         
         const joinedInPeriod = firstEver.st >= from && firstEver.st <= to;
         const leftInPeriod = lastEver.endD >= baseDate && lastEver.endD <= to;
-        const renewedSoon = allData.some(c=>c.client===name && c.st.getTime() === lastEver.endD.getTime()+864e5);
+        const renewedSoon = allData.some(c=>c.client===name && c.st.getTime() === lastEver.endD.getTime()+1);
         const actuallyLeft = leftInPeriod && !renewedSoon;
 
         let cat = 'Other';
@@ -48,7 +48,7 @@ function dashRange(){
         else if(inBase) cat = 'Retained';
         else if(firstEver.st < from && getMRR(name, now) > 0) cat = 'Resurrected';
         
-        clientMeta[name] = {cat, firstEver, lastEver, mrrBase: inBase ? mBase : 0};
+        clientMeta[name] = {cat, firstEver, lastEver, firstMgrs, mrrBase: inBase ? mBase : 0};
     });
 
     const newClients=[], churnClients=[], expClients=[];
@@ -80,23 +80,30 @@ function dashRange(){
            const mStart = sSnap.contracts.filter(c=>c.client===name).reduce((s,x)=>s+x.musd,0);
            const mEnd = eSnap.contracts.filter(c=>c.client===name).reduce((s,x)=>s+x.musd,0);
            const delta = mEnd - mStart;
-           const mgr = (meta.lastEver||{}).mgr||'';
+           const mgr = meta.firstMgrs;
 
            // === ATRIBUCIYA (Confirmed Spec) ===
-            if (meta.cat === 'New' || meta.cat === 'Transient' || meta.cat === 'Resurrected') {
-               if (delta > 0) newM += delta;
-               if (meta.cat === 'Transient' && delta < 0) churnM += Math.abs(delta);
-               
-               if (!seenNew.has(name) && delta > 0) {
-                  seenNew.add(name);
-                  const isRe = meta.cat === 'Resurrected';
-                  let reD = meta.firstEver.st;
-                  if(isRe){
-                     const cts = allData.filter(c=>c.client===name && c.st>=from);
-                     if(cts.length) reD = cts.reduce((a,c)=>c.st<a.st?c:a).st;
-                  }
-                  newClients.push({name, date: reD, mgr, mrr: Math.round(getMRR(name, now)), isRechurn: isRe, hudud: meta.firstEver.hudud||'', dur: meta.firstEver.dur||0, tUSD: meta.firstEver.tUSD||0});
-               }
+           if (meta.cat === 'New' || meta.cat === 'Transient') {
+              if (delta > 0) newM += delta;
+              if (meta.cat === 'Transient' && delta < 0) churnM += Math.abs(delta);
+              
+              if (!seenNew.has(name) && delta > 0) {
+                 seenNew.add(name);
+                 let activeCt = meta.firstEver;
+                 const binCts = allData.filter(c => c.client === name && c.st <= binEnd && c.musd > 0);
+                 if (binCts.length) activeCt = binCts.reduce((a,c) => c.st > a.st ? c : a);
+                 newClients.push({
+                    name, 
+                    date: activeCt.st, 
+                    mgr, 
+                    mrr: activeCt.musd, 
+                    hudud: activeCt.hudud || '', 
+                    dur: activeCt.dur || 0, 
+                    tUSD: activeCt.tUSD || 0,
+                    sUSD: activeCt.sUSD || 0,
+                    izoh: activeCt.izoh || ''
+                 });
+              }
               if (meta.cat === 'Transient' && !seenChurn.has(name) && delta < 0) {
                  seenChurn.add(name);
                  const cDate = new Date(meta.lastEver.endD.getFullYear(), meta.lastEver.endD.getMonth(), meta.lastEver.endD.getDate() + 1);
@@ -110,27 +117,47 @@ function dashRange(){
                  if (!seenChurn.has(name)) {
                     seenChurn.add(name);
                     const cDate = new Date(meta.lastEver.endD.getFullYear(), meta.lastEver.endD.getMonth(), meta.lastEver.endD.getDate() + 1);
-                    churnClients.push({name, date: cDate, mgr, mrr: Math.round(meta.mrrBase), izoh: ''});
+                    churnClients.push({name, date: cDate, mgr, mrr: Math.round(meta.mrrBase), izoh: '', hudud: meta.firstEver?.hudud||''});
                  }
               } else { churnM -= delta; } 
            }
-            else if (meta.cat === 'Retained') { // Ffaqat Retained qoldi, Resurrected New ga o'tdi
-               if (Math.abs(delta) > 1) {
-                 if (delta > 0) expM += delta; else conM += Math.abs(delta);
-                 if (!seenExp.has(name)) {
-                    seenExp.add(name);
-                    const mToday = getMRR(name, now);
-                    let lastDate = binStart;
-                    const evts = [];
-                    allData.filter(c=>c.client===name).forEach(c=>{
-                        const sD=new Date(c.st.getFullYear(),c.st.getMonth(),c.st.getDate());
-                        if(sD>=from&&sD<=to)evts.push(sD);
-                        const eD=new Date(c.endD.getFullYear(),c.endD.getMonth(),c.endD.getDate()+1);
-                        if(eD>=from&&eD<=to)evts.push(eD);
-                    });
-                    if(evts.length){evts.sort((a,b)=>b-a);lastDate=evts[0]}
-                    expClients.push({name, mrrStart: Math.round(meta.mrrBase), mrrEnd: Math.round(mToday), delta: Math.round(mToday - meta.mrrBase), mgr, date: lastDate});
-                 }
+           else if (meta.cat === 'Retained' || meta.cat === 'Resurrected') {
+              // Intra-period movement check
+              const binCts = allData.filter(c => c.client === name && c.musd > 0 && c.st <= binEnd && c.endD >= binStart);
+              const intraChurn = binCts.find(c => c.endD >= binStart && c.endD < binEnd && !allData.some(c2 => c2.client===name && c2.musd>0 && c2.st.getTime() === c.endD.getTime()+1));
+              const intraReturn = binCts.find(c => c.st > binStart && c.st <= binEnd && !allData.some(c2 => c2.client===name && c2.musd>0 && c2.endD.getTime() === c.st.getTime()-1));
+
+              if (intraChurn) {
+                  conM += mStart;
+                  if(!seenChurn.has(name)) {
+                      seenChurn.add(name);
+                      churnClients.push({name, date: new Date(intraChurn.endD.getTime()+864e5), mgr, mrr: Math.round(mStart), isIntra: true});
+                  }
+              }
+              if (intraReturn) {
+                  expM += mEnd;
+                  if(!seenExp.has(name)) {
+                      seenExp.add(name);
+                      expClients.push({name, mrrStart: 0, mrrEnd: Math.round(mEnd), delta: Math.round(mEnd), mgr, date: intraReturn.st, isIntra: true, isRes: meta.cat === 'Resurrected'});
+                  }
+              }
+
+              if (!intraReturn && Math.abs(delta) > 1) {
+                if (delta > 0) expM += delta; else conM += Math.abs(delta);
+                if (!seenExp.has(name)) {
+                   seenExp.add(name);
+                   const mToday = getMRR(name, now);
+                   let lastDate = binStart;
+                   const evts = [];
+                   allData.filter(c=>c.client===name).forEach(c=>{
+                       const sD=new Date(c.st.getFullYear(),c.st.getMonth(),c.st.getDate());
+                       if(sD>=from&&sD<=to)evts.push(sD);
+                       const eD=new Date(c.endD.getFullYear(),c.endD.getMonth(),c.endD.getDate()+1);
+                       if(eD>=from&&eD<=to)evts.push(eD);
+                   });
+                   if(evts.length){evts.sort((a,b)=>b-a);lastDate=evts[0]}
+                   expClients.push({name, mrrStart: Math.round(meta.mrrBase), mrrEnd: Math.round(mToday), delta: Math.round(mToday - meta.mrrBase), mgr, date: lastDate, isRes: meta.cat === 'Resurrected'});
+                }
               }
            }
            if (i === 0 && meta.mrrBase > 0) { startMRRsum += meta.mrrBase; exactBaseClients++; }
@@ -146,8 +173,305 @@ function dashRange(){
 
     newClients.sort((a,b)=>b.date-a.date); churnClients.sort((a,b)=>b.date-a.date);
     expClients.sort((a,b)=>b.date-a.date);
-    return {labels, totals, cpmArr, newPerPt, churnPerPt, addedMRR: newMrrArr, lostMRR: churnMrrArr, expMRR: expMrrArr, conMRR: conMrrArr, newClients, churnClients, expClients, gran, points, baseMRR: Math.round(startMRRsum), baseClients: exactBaseClients};
+    
+    // === DSO & CONCENTRATION ===
+    const debtTable = calcDebtTable(to);
+    const endingDebt = debtTable.reduce((s,r)=>s+Math.max(0,r.oyQarz),0);
+    // Period Total Revenue (accrued MRR)
+    let periodRevenue = 0;
+    totals.forEach((v, i) => {
+       const mDays = gran === 'day' ? 1 : new Date(points[i].getFullYear(), points[i].getMonth() + 1, 0).getDate();
+       periodRevenue += v * (mDays / 30); // Normalize MRR to period duration
+    });
+    const dso = periodRevenue > 0 ? (endingDebt / periodRevenue) * days : 0;
+
+    // Concentration (End weights)
+    const endWeights = names.map(n => ({ name: n, mrr: getMRR(n, to) })).sort((a,b)=>b.mrr - a.mrr);
+    const totalEndMRR = endWeights.reduce((s,x)=>s+x.mrr, 0);
+    const top5MRR = endWeights.slice(0,5).reduce((s,x)=>s+x.mrr,0);
+    const top10MRR = endWeights.slice(0,10).reduce((s,x)=>s+x.mrr,0);
+    const top5Conc = totalEndMRR > 0 ? (top5MRR / totalEndMRR * 100) : 0;
+    const top10Conc = totalEndMRR > 0 ? (top10MRR / totalEndMRR * 100) : 0;
+
+    let cashIn=0, cashInBreak={naqd:0,karta:0,bank:0};
+    if(S.payRows) S.payRows.forEach(r=>{
+      const d=pd(r['sanasi']);
+      if(d&&d>=from&&d<=to){
+        const v=pn(r['USD']||'0');
+        cashIn+=v;
+        const tt=(r['tolov turi']||'').toLowerCase();
+        if(tt.includes('naqd')) cashInBreak.naqd+=v;
+        else if(tt.includes('karta')) cashInBreak.karta+=v;
+        else if(tt.includes('bank')) cashInBreak.bank+=v;
+      }
+    });
+
+    // === LTV, QUICK RATIO, LOGO vs REVENUE CHURN ===
+    const curClients = cpmArr[cpmArr.length-1]||0;
+    const curMRR = totals[totals.length-1]||0;
+    const arpa = curClients > 0 ? curMRR / curClients : 0;
+    const logoChurnRate = exactBaseClients > 0 ? (churnClients.length / exactBaseClients) * 100 : 0;
+    const revenueChurnRate = startMRRsum > 0 ? (churnClients.reduce((s,c)=>s+c.mrr,0) / startMRRsum) * 100 : 0;
+    const monthlyChurnRate = logoChurnRate / Math.max(1, Math.round(days / 30));
+    const ltv = monthlyChurnRate > 0 ? Math.round(arpa / (monthlyChurnRate / 100)) : 0;
+    const mrrGrowth = newClients.reduce((s,c)=>s+c.mrr,0) + expClients.filter(x=>x.delta>0).reduce((s,x)=>s+x.delta,0);
+    const mrrLost = churnClients.reduce((s,c)=>s+c.mrr,0) + expClients.filter(x=>x.delta<0).reduce((s,x)=>s+Math.abs(x.delta),0);
+    const quickRatio = mrrLost > 0 ? mrrGrowth / mrrLost : (mrrGrowth > 0 ? 99 : 0);
+
+    // MRR Growth % per period (include first point using pre-period baseline)
+    const mrrGrowthPcts = totals.map((v,i) => {
+      if(i===0){
+        const preDate = new Date(from); preDate.setDate(preDate.getDate()-1);
+        const preMRR=mrrOnDate(preDate,all,qAll).total;
+        return preMRR>0 ? Math.round((v-preMRR)/preMRR*1000)/10 : 0;
+      }
+      return totals[i-1]>0 ? Math.round((v-totals[i-1])/totals[i-1]*1000)/10 : 0;
+    });
+
+    // Net MRR Movement (Variant B: new client intra-period expansion → Expansion)
+    const endSnap = mrrOnDate(to, all, qAll);
+    const endClientMRR = {};
+    endSnap.contracts.forEach(c => { endClientMRR[c.client] = (endClientMRR[c.client]||0) + c.musd; });
+    let newClientIntraExp = 0;
+    newClients.forEach(c => {
+      const endMRR = endClientMRR[c.name] || 0;
+      if(endMRR > c.mrr) newClientIntraExp += Math.round(endMRR - c.mrr);
+    });
+    const netMovement = {
+      newMRR: newClients.reduce((s,c)=>s+c.mrr,0),
+      churnMRR: churnClients.reduce((s,c)=>s+c.mrr,0),
+      expMRR: expClients.filter(x=>x.delta>0).reduce((s,x)=>s+x.delta,0) + newClientIntraExp,
+      conMRR: expClients.filter(x=>x.delta<0).reduce((s,x)=>s+Math.abs(x.delta),0),
+      newClientIntraExp
+    };
+    netMovement.net = netMovement.newMRR + netMovement.expMRR - netMovement.churnMRR - netMovement.conMRR;
+
+    // === CAC & LTV:CAC ===
+    let marketingSpend = 0;
+    const mCosts = S.marketingCosts || {};
+    // Iterate through months in range
+    for (let d = new Date(from.getFullYear(), from.getMonth(), 1); d <= to; d.setMonth(d.getMonth() + 1)) {
+        const key = d.getFullYear() + '-' + (d.getMonth() + 1);
+        marketingSpend += (mCosts[key] || 0);
+    }
+    const cac = newClients.length > 0 ? (marketingSpend / newClients.length) : 0;
+    const ltvCac = cac > 0 ? (ltv / cac) : 0;
+
+    return {labels, totals, cpmArr, newPerPt, churnPerPt, addedMRR: newMrrArr, lostMRR: churnMrrArr, expMRR: expMrrArr, conMRR: conMrrArr, newClients, churnClients, expClients, gran, points, baseMRR: Math.round(startMRRsum), baseClients: exactBaseClients, cashIn, cashInBreak, dso, top5Conc, top10Conc, ltv, quickRatio, logoChurnRate, revenueChurnRate, mrrGrowthPcts, netMovement, cac, ltvCac, clientMeta};
   });
+}
+
+
+
+// === CONTRACT RENEWAL CALENDAR ===
+function calcRenewals(){
+  return cached('renewals_v3',()=>{
+    const now=new Date(), map={};
+    const allCts=[...S.rows,...S.qRows];
+    allCts.forEach(r=>{
+      if(!r.Client)return;
+      const musd=r._mUSD||pn(r['Oylik USD'])||0; if(musd<=0)return;
+      const en=pd(r['amal qilishi']); if(!en)return;
+      const name=r.Client;
+      if(!map[name]) map[name]={name, endDate:en, mrr:0};
+      map[name].mrr+=musd;
+      if(en<map[name].endDate) map[name].endDate=en;
+    });
+    const res=[];
+    Object.values(map).forEach(c=>{
+      c.daysLeft=Math.round((c.endDate-now)/864e5);
+      // Show: up to 25 days ahead + expired up to 10 days ago
+      if(c.daysLeft<=25 && c.daysLeft>=-10) res.push(c);
+    });
+    res.sort((a,b)=>a.daysLeft-b.daysLeft);
+    return res;
+  });
+}
+
+// === REGIONAL PERFORMANCE ===
+function calcRegionalPerf(){
+  return cached('regional_v1',()=>{
+    const dr=dashRange(), regions={};
+    const now=S.dashTo;
+    const {all,qAll}=buildContracts();
+    const snap=mrrOnDate(now,all,qAll);
+    snap.contracts.forEach(c=>{
+      const h=c.hudud||'Nomalum';
+      if(!regions[h]) regions[h]={name:h, mrr:0, clients:new Set(), count:0};
+      regions[h].mrr+=c.musd; regions[h].clients.add(c.client);
+    });
+    Object.values(regions).forEach(r=>r.count=r.clients.size);
+    dr.newClients.forEach(c=>{const h=c.hudud||'Nomalum'; if(regions[h]) regions[h].newCount=(regions[h].newCount||0)+1});
+    dr.churnClients.forEach(c=>{
+      const h=c.hudud||'Nomalum';
+      if(regions[h]) regions[h].churnCount=(regions[h].churnCount||0)+1;
+    });
+    return Object.values(regions).sort((a,b)=>b.mrr-a.mrr);
+  });
+}
+
+// === MANAGER LEADERBOARD ===
+function calcManagerBoard(){
+  return cached('mgrboard_v1',()=>{
+    const dr=dashRange(), mgrs={};
+    const add=(mRaw,type,countVal,mrrVal)=>{
+      const list=mRaw.split(',').map(n=>n.trim()).filter(Boolean);
+      const split=list.length||1;
+      list.forEach(m=>{
+        if(!mgrs[m]) mgrs[m]={name:m, newCount:0, newMRR:0, churnCount:0, churnMRR:0, expMRR:0, conMRR:0};
+        if(type==='new'){ mgrs[m].newCount+=countVal; mgrs[m].newMRR+=mrrVal/split; }
+        else if(type==='churn'){ mgrs[m].churnCount+=countVal; mgrs[m].churnMRR+=mrrVal/split; }
+        else if(type==='exp'){ mgrs[m].expMRR+=mrrVal/split; }
+        else if(type==='con'){ mgrs[m].conMRR+=mrrVal/split; }
+      });
+    };
+    dr.newClients.forEach(c=>add(c.mgr||'Nomalum','new',1,c.mrr));
+    dr.churnClients.forEach(c=>add(c.mgr||'Nomalum','churn',1,c.mrr));
+    dr.expClients.forEach(c=>{
+      const r=S.rows.find(x=>x.Client===c.name);
+      const m=r?.Manager||'Nomalum';
+      if(c.delta>0) add(m,'exp',0,c.delta);
+      else add(m,'con',0,Math.abs(c.delta));
+    });
+    Object.values(mgrs).forEach(m=>m.netMRR=m.newMRR+m.expMRR-m.conMRR-m.churnMRR);
+    return Object.values(mgrs).sort((a,b)=>b.netMRR-a.netMRR);
+  });
+}
+
+// === CLIENT HEALTH SCORE ===
+function calcClientHealth(){
+  return cached('health_v1',()=>{
+    const now=new Date(), debt=calcDebtTable(now), res=[];
+    const {all,qAll}=buildContracts();
+    
+    const firstDates={};
+    [...all, ...qAll].forEach(c=>{
+      if(!firstDates[c.client] || c.st < firstDates[c.client]) firstDates[c.client] = c.st;
+    });
+
+    const snap=mrrOnDate(now,all,qAll);
+    const debtMap={}; debt.forEach(d=>debtMap[d.name]=d);
+    const clients=new Set(); snap.contracts.forEach(c=>clients.add(c.client));
+    clients.forEach(name=>{
+      const cts=snap.contracts.filter(c=>c.client===name);
+      if(!cts.length)return;
+      const mrr=cts.reduce((s,c)=>s+c.musd,0);
+      const earliestEnd=cts.reduce((a,c)=>c.endD<a?c.endD:a, cts[0].endD);
+      const daysToEnd=Math.round((earliestEnd-now)/864e5);
+      const d=debtMap[name];
+      let score=100;
+      if(d){
+        if(d.oyQarz>mrr*2) score-=40;
+        else if(d.oyQarz>mrr) score-=25;
+        else if(d.oyQarz>0) score-=10;
+      }
+      if(daysToEnd<30) score-=20;
+      else if(daysToEnd<60) score-=10;
+      const earliest=firstDates[name] || cts.reduce((a,c)=>c.st<a?c.st:a, new Date());
+      const tenureM=Math.round((now-earliest)/864e5/30);
+      if(tenureM<3) score-=10;
+      score=Math.max(0,Math.min(100,score));
+      const status=score>=80?'healthy':score>=50?'warning':'critical';
+      res.push({name, mrr, score, status, daysToEnd, debt:d?d.oyQarz:0, tenureM});
+    });
+
+    debt.forEach(d => {
+      if(d.oyQarz > 0 && !clients.has(d.name)){
+        let score = d.oyQarz > 500 ? 30 : 50;
+        const status = score >= 50 ? 'warning' : 'critical';
+        const earliest = firstDates[d.name] || now;
+        const tenureM = Math.round((now - earliest) / 864e5 / 30);
+        res.push({name: d.name, mrr: 0, score, status, daysToEnd: -999, debt: d.oyQarz, tenureM});
+      }
+    });
+
+    res.sort((a,b)=>a.score-b.score);
+    return res;
+  });
+}
+
+// === COHORT ANALYSIS ===
+function calcCohorts() {
+  return cached('cohorts_v1',()=>{
+    const clStart = {};
+    const {all, qAll} = buildContracts();
+    const now = new Date();
+    all.filter(c=>c.musd>0).forEach(c=>{
+        const st = new Date(c.st.getFullYear(), c.st.getMonth(), 1);
+        if(!clStart[c.client] || st < clStart[c.client]) clStart[c.client] = st;
+    });
+    const cohorts = {};
+    Object.keys(clStart).forEach(cn => {
+        const sd = clStart[cn];
+        const key = sd.getFullYear()+'-'+String(sd.getMonth()+1).padStart(2,'0');
+        if(!cohorts[key]) cohorts[key] = { date: sd, clients: [] };
+        if(sd.getFullYear() >= 2024) cohorts[key].clients.push(cn);
+    });
+    const keys = Object.keys(cohorts).sort((a,b)=>cohorts[a].date - cohorts[b].date);
+    return keys.map(k => {
+        const cgt = cohorts[k];
+        const row = { name: k, total: cgt.clients.length, months: [] };
+        if(row.total === 0) return row;
+        const y = cgt.date.getFullYear(), m = cgt.date.getMonth();
+        const diffMonths = (now.getFullYear() - y)*12 + (now.getMonth() - m);
+        
+        for(let i=0; i<=diffMonths; i++) {
+            const tDate = new Date(y, m + i + 1, 0, 23, 59, 59);
+            if(tDate > new Date(now.getFullYear(), now.getMonth()+1, 0)) break;
+            
+            let active = 0;
+            cgt.clients.forEach(cn => {
+                const isAct = all.concat(qAll).some(x => x.client===cn && x.musd!==0 && x.st<=tDate && x.endD>=tDate);
+                if(isAct) active++;
+            });
+            row.months.push(active);
+        }
+        return row;
+    }).filter(r=>r.total>0);
+  });
+}
+ 
+function calcManagerAcquisition() {
+    return cached('managerAcq', () => {
+        const clients = {};
+        S.rows.forEach(r => {
+            if (!r.Client || !r.sanasi) return;
+            const name = r.Client;
+            const mrr = r._mUSD || 0;
+            const st = pd(r.sanasi);
+            if (!st) return;
+
+            if (!clients[name]) {
+                const mgrRaw = r.Manager || 'Tayinlanmagan';
+                clients[name] = { 
+                    managers: new Set(mgrRaw.split(',').map(n => n.trim()).filter(Boolean)), 
+                    firstMRR: mrr, 
+                    firstDate: st 
+                };
+            } else {
+                if (st < clients[name].firstDate) {
+                    const mgrRaw = r.Manager || 'Tayinlanmagan';
+                    clients[name].managers = new Set(mgrRaw.split(',').map(n => n.trim()).filter(Boolean));
+                    clients[name].firstMRR = mrr;
+                    clients[name].firstDate = st;
+                }
+            }
+        });
+
+        const mgrs = {};
+        Object.entries(clients).forEach(([name, data]) => {
+            const mSet = data.managers;
+            const count = mSet.size;
+            const splitMRR = data.firstMRR / count;
+            mSet.forEach(m => {
+                if (!mgrs[m]) mgrs[m] = { clients: 0, initialMRR: 0 };
+                mgrs[m].clients += 1;
+                mgrs[m].initialMRR += splitMRR;
+            });
+        });
+
+        return Object.entries(mgrs).map(([name, d]) => ({ name, ...d })).sort((a,b) => b.initialMRR - a.initialMRR);
+    });
 }
 
 // === MRR DATA ===
@@ -331,4 +655,51 @@ function initNav(){
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     el.classList.add('active');S.sec=el.dataset.sec;clearCache();render();closeSidebar();
   }));
+}
+
+function showMgrStats(mgrName) {
+    const dr = dashRange();
+    const cls = [];
+    Object.keys(dr.clientMeta || {}).forEach(name => {
+        const meta = dr.clientMeta[name];
+        const mgrs = (meta.firstMgrs || '').split(',').map(n => n.trim()).filter(Boolean);
+        if (mgrs.includes(mgrName)) {
+            cls.push({
+                name,
+                date: meta.firstEver.st,
+                mrr: meta.firstEver.musd
+            });
+        }
+    });
+    cls.sort((a,b) => b.date - a.date);
+
+    const o = document.createElement('div');
+    o.className = 'overlay';
+    o.onclick = e => { if (e.target === o) o.remove(); };
+    
+    o.innerHTML = `<div class="modal" style="max-width:540px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+            <h3 style="margin:0;font-size:16px">${mgrName} — Mijozlar</h3>
+            <button class="btn-close" onclick="this.closest('.overlay').remove()" style="background:none;border:none;cursor:pointer;color:var(--text3)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="tbl-wrap" style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+            <table style="width:100%;border-collapse:collapse">
+                <thead style="position:sticky;top:0;background:var(--bg2);z-index:10;box-shadow:0 1px 0 var(--border)">
+                    <tr><th style="text-align:left;padding:10px">Mijoz</th><th style="padding:10px">Sana</th><th style="text-align:right;padding:10px">Olib kelgan MRR ($)</th></tr>
+                </thead>
+                <tbody>
+                    ${cls.map(c => `<tr>
+                        <td style="padding:10px;font-weight:600;font-size:12px">${c.name}</td>
+                        <td style="padding:10px;text-align:center;font-size:11px" class="mono">${fmtD(c.date)}</td>
+                        <td style="padding:10px;text-align:right;font-size:11px" class="mono">${fmt(c.mrr)}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>
+        ${cls.length === 0 ? '<div style="padding:30px;text-align:center;color:var(--text3);font-size:12px">Mijozlar topilmadi</div>' : ''}
+        <div style="margin-top:20px;text-align:right">
+            <button class="btn btn-primary" onclick="this.closest('.overlay').remove()">Yopish</button>
+        </div>
+    </div>`;
+    document.body.appendChild(o);
 }
