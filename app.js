@@ -587,6 +587,18 @@ function calcCumExpected(year){
     S.rows.forEach(r=>{if(!r.Client||!r.sanasi)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st||!r._mUSD||r._mUSD<=0)return;const endD=en||new Date(st.getTime()+(r._dur||12)*30.44*24*3600*1000);endD.setHours(23,59,59,999);const c=r.Client;if(!allCts[c])allCts[c]=[];allCts[c].push({musd:r._mUSD,tUSD:r._tUSD||0,st,endD,isQ:false})});
     S.qRows.forEach(r=>{if(!r.Client||!r.sanasi)return;const musd=pn(r['Oylik USD']);if(!musd)return;const st=pd(r.sanasi),en=pd(r['amal qilishi']);if(!st)return;const endD=en||new Date(st.getTime()+(parseFloat(r['muddati (oy)'])||12)*30.44*24*3600*1000);const c=r.Client;if(!allCts[c])allCts[c]=[];allCts[c].push({musd,tUSD:pn(r['Tadbiq USD'])||0,st,endD,isQ:true})});
     Object.entries(allCts).forEach(([name,cts])=>{
+      // Precompute firstMP and lastMP per contract (mirrors calcDebtTable logic)
+      cts.forEach(ct=>{
+        const fmE=new Date(ct.st.getFullYear(),ct.st.getMonth()+1,0);
+        const on1st=ct.st.getDate()===1;
+        ct._fmp=on1st?ct.musd:Math.round(ct.musd*Math.max(1,Math.round((fmE-ct.st)/864e5)+1)/fmE.getDate());
+        if(!ct.isQ){
+          const lmE=new Date(ct.endD.getFullYear(),ct.endD.getMonth()+1,0);
+          ct._lmp=on1st
+            ?(ct.endD.getDate()===lmE.getDate()?ct.musd:Math.round(ct.musd*ct.endD.getDate()/lmE.getDate()))
+            :ct.musd-ct._fmp;
+        }
+      });
       const minSt=cts.reduce((a,c)=>c.st<a?c.st:a,cts[0].st);
       let cumTotal=0,preYear=0;const cum12=new Array(12).fill(0);
       for(let y=minSt.getFullYear();y<=year;y++){
@@ -595,9 +607,10 @@ function calcCumExpected(year){
           const mS=new Date(y,m,1),mE=new Date(y,m+1,0);const dim=mE.getDate();let monthExp=0;
           cts.forEach(ct=>{if(ct.st>mE||ct.endD<mS)return;const isFirst=(ct.st>=mS&&ct.st<=mE),isLast=(ct.endD>=mS&&ct.endD<=mE);
             if(isFirst)monthExp+=ct.tUSD||0;
-            if(isFirst&&isLast){monthExp+=ct.musd*Math.max(1,Math.round((ct.endD-ct.st)/864e5)+1)/dim}
-            else if(isFirst){monthExp+=ct.musd*Math.max(1,Math.round((mE-ct.st)/864e5)+1)/dim}
-            else if(isLast&&ct.isQ){monthExp+=ct.musd*Math.max(1,ct.endD.getDate())/dim}
+            if(isFirst&&isLast){monthExp+=Math.round(ct.musd*Math.max(1,Math.round((ct.endD-ct.st)/864e5)+1)/dim)}
+            else if(isFirst){monthExp+=ct._fmp}
+            else if(isLast&&!ct.isQ){monthExp+=ct._lmp}
+            else if(isLast&&ct.isQ){monthExp+=Math.round(ct.musd*Math.max(1,ct.endD.getDate())/dim)}
             else{monthExp+=ct.musd}
           });
           cumTotal+=monthExp;if(y===year)cum12[m]=Math.round(cumTotal);
